@@ -31,19 +31,19 @@ void encoder_pcnt_init(void){
 
     // PCNT unit configuration (left)
     ESP_LOGI(TAG, "install pcnt unit left");
-    pcnt_unit_config_t unit_config = {
+    pcnt_unit_config_t unit_config_left = {
         .high_limit = HIGH_LIMIT,
         .low_limit = LOW_LIMIT,
     };
-    ESP_ERROR_CHECK(pcnt_new_unit(&unit_config, &pcnt_unit_left));
+    ESP_ERROR_CHECK(pcnt_new_unit(&unit_config_left, &pcnt_unit_left));
 
     // PCNT unit configuration (right)
     ESP_LOGI(TAG, "install pcnt unit right");
-    pcnt_unit_config_t unit_config = {
+    pcnt_unit_config_t unit_config_right = {
         .high_limit = HIGH_LIMIT,
         .low_limit = LOW_LIMIT,
     };
-    ESP_ERROR_CHECK(pcnt_new_unit(&unit_config, &pcnt_unit_right));
+    ESP_ERROR_CHECK(pcnt_new_unit(&unit_config_right, &pcnt_unit_right));
 
 
     // Glitch filter for left and right encoder (used to filter out noise)
@@ -99,6 +99,7 @@ void encoder_pcnt_init(void){
     ESP_ERROR_CHECK(pcnt_channel_set_level_action(pcnt_chan_left_a, PCNT_CHANNEL_LEVEL_ACTION_KEEP, PCNT_CHANNEL_LEVEL_ACTION_INVERSE));
     ESP_ERROR_CHECK(pcnt_channel_set_edge_action(pcnt_chan_left_b, PCNT_CHANNEL_EDGE_ACTION_INCREASE, PCNT_CHANNEL_EDGE_ACTION_DECREASE));
     ESP_ERROR_CHECK(pcnt_channel_set_level_action(pcnt_chan_left_b, PCNT_CHANNEL_LEVEL_ACTION_KEEP, PCNT_CHANNEL_LEVEL_ACTION_INVERSE));
+
     ESP_ERROR_CHECK(pcnt_channel_set_edge_action(pcnt_chan_right_a, PCNT_CHANNEL_EDGE_ACTION_DECREASE, PCNT_CHANNEL_EDGE_ACTION_INCREASE));
     ESP_ERROR_CHECK(pcnt_channel_set_level_action(pcnt_chan_right_a, PCNT_CHANNEL_LEVEL_ACTION_KEEP, PCNT_CHANNEL_LEVEL_ACTION_INVERSE));
     ESP_ERROR_CHECK(pcnt_channel_set_edge_action(pcnt_chan_right_b, PCNT_CHANNEL_EDGE_ACTION_INCREASE, PCNT_CHANNEL_EDGE_ACTION_DECREASE));
@@ -157,8 +158,8 @@ void pcnt_read_task(void *arg) {
             xQueueSend(q, &compute_data, 0);
 
             // If you want a "rate", delta per 0.5s -> ticks/sec = delta * 2
-            ESP_LOGI(TAG, "left count=%d  delta(500ms)=%d  approx ticks/s=%d",
-                     left_count, left_delta, left_delta * 2);
+            ESP_LOGI(TAG, "left count=%d  left delta(500ms)=%d  left approx ticks/s=%d, right count=%d  right delta(500ms)=%d  right approx ticks/s=%d",
+                     left_count, left_delta, left_delta * 2, right_count, right_delta, right_delta * 2);
         } else {
             ESP_LOGE(TAG, "pcnt_unit_get_count failed: %s", esp_err_to_name(left_err));
         }
