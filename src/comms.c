@@ -16,6 +16,9 @@
 #include "driver/uart.h"
 #include "encoder_queue_struct.h"
 
+#define TX_PIN 17
+#define RX_PIN 16
+
 // if we want to enable interrupts:
 // const uart_port_t uart_num = UART_NUM_2;
 // // Configure a UART interrupt threshold and timeout
@@ -57,7 +60,7 @@ void uart_init(void){
     ESP_ERROR_CHECK(uart_param_config(uart_num, &uart_config));
 
     // Set UART pins(TX: IO4, RX: IO5, RTS: IO18, CTS: IO19) (these were the given ones but I think we need to change this - come back to this)
-    ESP_ERROR_CHECK(uart_set_pin(uart_num, 17, 16, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
+    ESP_ERROR_CHECK(uart_set_pin(uart_num, TX_PIN, RX_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
 }
 
 
