@@ -40,12 +40,13 @@ const uart_port_t uart_num = UART_NUM_2;
 void uart_init(void){
 
     // allocating required internal resoruces for the UART driver  
-    // Setup UART buffered IO with event queue (value from documentation, we can change later)
-    const int uart_buffer_size = (1024 * 2);
+    // Setup UART buffered IO with event queue (value from documentation, we can change later) - changed tx to 256 and rx to 1024 becauase I wanted it to 
+    // be small and non-blocking for UART
+    const int uart_tx_buffer_size = 256;
+    const int uart_rx_buffer_size = 1024;
 
     // Install UART driver using an event queue here
-    ESP_ERROR_CHECK(uart_driver_install(uart_num, uart_buffer_size, uart_buffer_size, 0, NULL, 0));
-
+    ESP_ERROR_CHECK(uart_driver_install(uart_num, uart_tx_buffer_size, uart_rx_buffer_size, 0, NULL, 0));
 
     // configuring UART comms parameters
     uart_config_t uart_config = {
