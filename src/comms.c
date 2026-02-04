@@ -33,7 +33,7 @@
 // ESP_ERROR_CHECK(uart_enable_rx_intr(uart_num));
 
 // global variables 
-const uart_port_t uart_num = UART_NUM_2;
+const uart_port_t uart_num = UART_NUM_0;
 
 
 // here is where we will initialize UART sending
@@ -59,9 +59,6 @@ void uart_init(void){
     };
     // Configure UART parameters
     ESP_ERROR_CHECK(uart_param_config(uart_num, &uart_config));
-
-    // Set UART pins(TX: IO4, RX: IO5, RTS: IO18, CTS: IO19) (these were the given ones but I think we need to change this - come back to this)
-    ESP_ERROR_CHECK(uart_set_pin(uart_num, TX_PIN, RX_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
 }
 
 
@@ -78,6 +75,9 @@ void uart_send_task(void* arg){
 
             // Write data to UART
             uart_write_bytes(uart_num, (const char*)&trasnmit_encoder_data, sizeof(trasnmit_encoder_data));
+            // const char* test_msg = "Hello from UART\n";
+            // size_t msg_length = strlen(test_msg);
+            // uart_write_bytes(UART_NUM_0, test_msg, msg_length);
         }
     }
 }
