@@ -66,12 +66,16 @@ void uart_send_task(void* arg){
 
     // want to get the data from the PCNT queue
     QueueHandle_t q = (QueueHandle_t) arg;
-    encoder_data trasnmit_encoder_data;
+    encoder_data_t trasnmit_encoder_data;
 
     for (;;){
 
         // this current way is blocking until there is a sample available - can change later
         if (xQueueReceive(q, &trasnmit_encoder_data, portMAX_DELAY) == pdTRUE){
+
+            // build packet
+            char packet_buf[sizeof(uart_header_t) + sizeof(encoder_data_t)];
+            int err = build_data_packet(packet_buf, trasnmit_encoder_data);
 
             // Write data to UART
             uart_write_bytes(uart_num, (const char*)&trasnmit_encoder_data, sizeof(trasnmit_encoder_data));
@@ -97,3 +101,31 @@ void uart_send_task(void* arg){
     // can use this if we want a break signal
     // // Write data to UART, end with a break signal.
     // uart_write_bytes_with_break(uart_num, "test break\n",strlen("test break\n"), 100);
+
+void build__data_packet(void *buffer, encoder_data_t encoder_data) {
+    static seq_num = 0; // value persists throughout calls
+    //build header
+    uart_header_t *header = (uart_header_t *)buffer;
+    header->seq = seq_num++;
+    header->type_flag = 1;
+    header->length = sizeof(encoder_data_t);
+
+    //build payload
+    memcpy(buffer + sizeof(uart_header_t), &encoder_data, sizeof(encoder_data_t));
+
+    // calculate checksum
+    header->checksum = calculate_checksum(buffer, (sizeof(uart_header_t) + sizeof(encoder_data_t)));
+}
+
+uint16_t calculate_checksum(const void *data, size_t len) { // stolen from schmitt if we have any issues 
+    const uint8_t *bytes = (const uint8_t *)data;
+    uint32_t sum = 0;
+    for (size_t i = 0; i < len; i++) {
+        sum += bytes[i];
+    }
+    // Fold 32-bit sum into 16 bits
+    while (sum >> 16) {
+        sum = (sum & 0xFFFF) + (sum >> 16);
+    }
+    return (uint16_t)~sum;
+}

@@ -129,7 +129,7 @@ void encoder_pcnt_init(void){
 void pcnt_read_task(void *arg) {
 
     QueueHandle_t q = (QueueHandle_t) arg;
-    encoder_data compute_data;
+    encoder_data_t compute_data;
 
     int left_last = 0;
     int right_last = 0;
