@@ -143,15 +143,15 @@ void pcnt_read_task(void *arg) {
         esp_err_t right_err = pcnt_unit_get_count(pcnt_unit_right, &right_count);
 
         if (left_err == ESP_OK && right_err == ESP_OK) {
-            int left_delta = left_count - left_last;
+            int16_t left_delta = left_count - left_last;
             left_last = left_count;
 
-            int right_delta = right_count - right_last;
+            int16_t right_delta = right_count - right_last;
             right_last = right_count;
 
             // not sure how we want to compute it, but I just have it set to the left_tick
-            compute_data.left_tick = left_count;
-            compute_data.right_tick = right_count;
+            compute_data.dL = left_delta;
+            compute_data.dR = right_count;
             compute_data.timestamp_ms = esp_timer_get_time();
 
             // sending the data to the queue

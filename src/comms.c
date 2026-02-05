@@ -74,8 +74,8 @@ void uart_send_task(void* arg){
         if (xQueueReceive(q, &trasnmit_encoder_data, portMAX_DELAY) == pdTRUE){
 
             // build packet
-            char packet_buf[sizeof(uart_header_t) + sizeof(encoder_data_t)];
-            int err = build_data_packet(packet_buf, trasnmit_encoder_data);
+            char packet_buf[sizeof(data_packet_t)];
+            build_data_packet(packet_buf, trasnmit_encoder_data);
 
             // Write data to UART
             uart_write_bytes(uart_num, (const char*)&trasnmit_encoder_data, sizeof(trasnmit_encoder_data));
@@ -102,19 +102,15 @@ void uart_send_task(void* arg){
     // // Write data to UART, end with a break signal.
     // uart_write_bytes_with_break(uart_num, "test break\n",strlen("test break\n"), 100);
 
-void build__data_packet(void *buffer, encoder_data_t encoder_data) {
-    static seq_num = 0; // value persists throughout calls
-    //build header
-    uart_header_t *header = (uart_header_t *)buffer;
-    header->seq = seq_num++;
-    header->type_flag = 1;
-    header->length = sizeof(encoder_data_t);
-
-    //build payload
-    memcpy(buffer + sizeof(uart_header_t), &encoder_data, sizeof(encoder_data_t));
-
+void build_data_packet(void *buffer, encoder_data_t encoder_data) {
+    static uint16_t seq_num = 0; // value persists throughout calls
+    //build packets
+    data_packet_t *packet = (data_packet_t *)buffer;
+    packet->SOF = (uint16_t)0xAA55;
+    memcpy(&(packet->encoder_data), &encoder_data, sizeof(encoder_data_t));
+    packet->seq = seq_num++;
     // calculate checksum
-    header->checksum = calculate_checksum(buffer, (sizeof(uart_header_t) + sizeof(encoder_data_t)));
+    packet->checksum = calculate_checksum(buffer, (sizeof(data_packet_t)));
 }
 
 uint16_t calculate_checksum(const void *data, size_t len) { // stolen from schmitt if we have any issues 
