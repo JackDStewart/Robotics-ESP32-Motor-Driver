@@ -43,7 +43,7 @@ void app_main(void){
 
     // creating a queue
     QueueHandle_t pcnt_tick_queue;
-    pcnt_tick_queue = xQueueCreate(32, sizeof(encoder_data));     // chose a random number (I chose to keep 32 samples at once - can change later)
+    pcnt_tick_queue = xQueueCreate(32, sizeof(encoder_data_t));     // chose a random number (I chose to keep 32 samples at once - can change later)
 
     // we are going to use this one in the future because we want to use both cores on the ESP32
     xTaskCreatePinnedToCore(
