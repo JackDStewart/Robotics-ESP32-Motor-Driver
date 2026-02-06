@@ -78,7 +78,7 @@ void uart_send_task(void* arg){
             build_data_packet(packet_buf, trasnmit_encoder_data);
 
             // Write data to UART
-            uart_write_bytes(uart_num, (const char*)&trasnmit_encoder_data, sizeof(trasnmit_encoder_data));
+            uart_write_bytes(uart_num, (const char*)&packet_buf, sizeof(data_packet_t));
             // const char* test_msg = "Hello from UART\n";
             // size_t msg_length = strlen(test_msg);
             // uart_write_bytes(UART_NUM_0, test_msg, msg_length);
