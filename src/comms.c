@@ -110,6 +110,7 @@ void build_data_packet(void *buffer, encoder_data_t encoder_data) {
     memcpy(&(packet->encoder_data), &encoder_data, sizeof(encoder_data_t));
     packet->seq = seq_num++;
     // calculate checksum
+    packet->checksum = 0;
     packet->checksum = calculate_checksum(buffer, (sizeof(data_packet_t)));
 }
 
