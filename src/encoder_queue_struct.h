@@ -1,4 +1,5 @@
 // here is the struct for sending the data to the queue
+#pragma once
 #include <stdint.h>
 
 typedef struct {
