@@ -15,8 +15,8 @@
 #define ENCODER_RIGHT_A 27
 #define ENCODER_RIGHT_B 33
 
-#define HIGH_LIMIT 1024
-#define LOW_LIMIT -1024
+#define HIGH_LIMIT INT16_MAX
+#define LOW_LIMIT INT16_MIN
 
 static const char *TAG = "PCNT_LOG:";
 

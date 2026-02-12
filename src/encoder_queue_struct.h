@@ -10,7 +10,6 @@ typedef struct {
 
 typedef struct {
 
-    uint16_t SOF; // signal new packet
     uint8_t seq; // seq num for testing loss
     encoder_data_t encoder_data;
     uint16_t checksum; 

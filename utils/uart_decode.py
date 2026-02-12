@@ -3,30 +3,30 @@ import struct
 import serial
 import time
 
-SOF = 0xAA55
-
 # encoder_data_t:
-#   int16_t dL
-#   int16_t dR
+#   int16_t dL   (pcnt, -32768..32767)
+#   int16_t dR   (pcnt, -32768..32767)
 #   uint32_t timestamp_ms
 ENCODER_FMT = "<hhI"
 ENCODER_SIZE = struct.calcsize(ENCODER_FMT)  # 8 bytes
 
-# data_packet_t (packed):
-#   uint16_t SOF
+# data payload (no SOF, framed with COBS + 0x00 delimiter):
 #   uint8_t  seq
-#   encoder_data_t encoder_data
+#   int16_t  dL
+#   int16_t  dR
+#   uint32_t timestamp_ms
 #   uint16_t checksum
-PACKET_FMT = "<HB" + "hhI" + "H"
-PACKET_SIZE = struct.calcsize(PACKET_FMT)    # 13 bytes
+PAYLOAD_FMT = "<BhhIH"
+PAYLOAD_SIZE = struct.calcsize(PAYLOAD_FMT)  # 11 bytes
 
 
 def calc_checksum_like_c(packet_bytes: bytes) -> int:
     """
-    Matches your C checksum IF you zero the checksum field before computing.
-    In C you should do:
-        packet->checksum = 0;
-        packet->checksum = calculate_checksum(buffer, sizeof(data_packet_t));
+    Same checksum style as before:
+      - sum all bytes (uint32 accumulator)
+      - fold to 16 bits
+      - one's complement
+    Caller should zero checksum field bytes before computing.
     """
     s = 0
     for b in packet_bytes:
@@ -36,9 +36,37 @@ def calc_checksum_like_c(packet_bytes: bytes) -> int:
     return (~s) & 0xFFFF
 
 
-def find_sof(buf: bytearray) -> int:
-    # SOF=0xAA55 as uint16 little-endian -> bytes 55 AA
-    return buf.find(struct.pack("<H", SOF))
+def cobs_decode(encoded: bytes) -> bytes:
+    """
+    Standard COBS decode (0x00 is the frame delimiter and is NOT included here).
+    Raises ValueError on malformed input.
+    """
+    if not encoded:
+        return b""
+
+    out = bytearray()
+    i = 0
+    n = len(encoded)
+
+    while i < n:
+        code = encoded[i]
+        if code == 0:
+            raise ValueError("COBS decode error: zero code byte")
+        i += 1
+
+        copy_len = code - 1
+        if i + copy_len > n:
+            raise ValueError("COBS decode error: code overrun")
+
+        if copy_len:
+            out.extend(encoded[i : i + copy_len])
+            i += copy_len
+
+        # Insert a 0x00 between blocks if code != 0xFF and we're not at end
+        if code != 0xFF and i < n:
+            out.append(0)
+
+    return bytes(out)
 
 
 def main():
@@ -50,7 +78,8 @@ def main():
 
     ser = serial.Serial(args.port, args.baud, timeout=args.timeout)
     print(f"Listening on {ser.port} @ {ser.baudrate} baud")
-    print(f"Expecting PACKET_SIZE={PACKET_SIZE} bytes (SOF+seq+dL+dR+timestamp+checksum)")
+    print(f"Expecting COBS-framed payloads of PAYLOAD_SIZE={PAYLOAD_SIZE} bytes after decode")
+    print("Frame delimiter: 0x00")
     print("Press Ctrl+C to stop.\n")
 
     buf = bytearray()
@@ -61,30 +90,38 @@ def main():
             if chunk:
                 buf.extend(chunk)
 
+            # Process all complete frames currently in buf (frames end with 0x00)
             while True:
-                i = find_sof(buf)
-                if i < 0:
-                    # prevent runaway buffer if no SOF found
-                    if len(buf) > 8192:
-                        del buf[:-2]
+                try:
+                    end = buf.index(0)  # first 0x00 delimiter
+                except ValueError:
+                    # no complete frame yet
+                    if len(buf) > 65536:
+                        # prevent runaway if delimiter never arrives
+                        del buf[:-1024]
                     break
 
-                # drop bytes before SOF
-                if i > 0:
-                    del buf[:i]
+                frame = bytes(buf[:end])   # encoded (no delimiter)
+                del buf[: end + 1]         # drop encoded frame + delimiter
 
-                # need full packet
-                if len(buf) < PACKET_SIZE:
-                    break
+                if not frame:
+                    # ignore empty frames (possible if multiple delimiters)
+                    continue
 
-                packet_bytes = bytes(buf[:PACKET_SIZE])
-                del buf[:PACKET_SIZE]
+                try:
+                    decoded = cobs_decode(frame)
+                except ValueError as e:
+                    print(f"COBS decode error: {e}")
+                    continue
 
-                # unpack
-                sof, seq, dL, dR, timestamp_ms, rx_checksum = struct.unpack(PACKET_FMT, packet_bytes)
+                if len(decoded) != PAYLOAD_SIZE:
+                    print(f"Bad payload size after decode: {len(decoded)} (expected {PAYLOAD_SIZE})")
+                    continue
+
+                seq, dL, dR, timestamp_ms, rx_checksum = struct.unpack(PAYLOAD_FMT, decoded)
 
                 # verify checksum by zeroing checksum bytes then computing
-                tmp = bytearray(packet_bytes)
+                tmp = bytearray(decoded)
                 tmp[-2:] = b"\x00\x00"
                 computed = calc_checksum_like_c(bytes(tmp))
                 ok = (computed == rx_checksum)

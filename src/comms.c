@@ -15,6 +15,7 @@
 #include "comms.h"
 #include "driver/uart.h"
 #include "encoder_queue_struct.h"
+#include "cobs.h"
 
 #define TX_PIN 17
 #define RX_PIN 16
@@ -74,7 +75,8 @@ void uart_send_task(void* arg){
         if (xQueueReceive(q, &trasnmit_encoder_data, portMAX_DELAY) == pdTRUE){
 
             // build packet
-            char packet_buf[sizeof(data_packet_t)];
+            char packet_buf[sizeof(data_packet_t) + 1]; // add one for COBS overhead
+            ESP_LOGI("COMMS_LOG", "Buidling Data Packet\n");
             build_data_packet(packet_buf, trasnmit_encoder_data);
 
             // Write data to UART
@@ -103,15 +105,18 @@ void uart_send_task(void* arg){
     // uart_write_bytes_with_break(uart_num, "test break\n",strlen("test break\n"), 100);
 
 void build_data_packet(void *buffer, encoder_data_t encoder_data) {
+    
     static uint16_t seq_num = 0; // value persists throughout calls
     //build packets
-    data_packet_t *packet = (data_packet_t *)buffer;
-    packet->SOF = (uint16_t)0xAA55;
-    memcpy(&(packet->encoder_data), &encoder_data, sizeof(encoder_data_t));
-    packet->seq = seq_num++;
+    data_packet_t packet = {0};
+    ESP_LOGI("COMMS_LOG", "Starting MEMCPY\n");
+    memcpy(&(packet.encoder_data), &encoder_data, sizeof(encoder_data_t));
+    packet.seq = seq_num++;
     // calculate checksum
-    packet->checksum = 0;
-    packet->checksum = calculate_checksum(buffer, (sizeof(data_packet_t)));
+    packet.checksum = 0;
+    packet.checksum = calculate_checksum(buffer, (sizeof(data_packet_t)));
+    ESP_LOGI("COMMS_LOG", "Starting COBS\n");
+    cobs_encode(&packet, sizeof(data_packet_t), buffer, sizeof(buffer));
 }
 
 uint16_t calculate_checksum(const void *data, size_t len) { // stolen from schmitt if we have any issues 
