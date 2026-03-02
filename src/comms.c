@@ -15,7 +15,7 @@
 #include "comms.h"
 #include "driver/uart.h"
 #include "encoder_queue_struct.h"
-#include "cobs.h"
+// #include "cobs.h"
 
 #define TX_PIN 17
 #define RX_PIN 16
@@ -74,13 +74,18 @@ void uart_send_task(void* arg){
         // this current way is blocking until there is a sample available - can change later
         if (xQueueReceive(q, &trasnmit_encoder_data, portMAX_DELAY) == pdTRUE){
 
-            // build packet
-            char packet_buf[sizeof(data_packet_t) + 1]; // add one for COBS overhead
-            ESP_LOGI("COMMS_LOG", "Buidling Data Packet\n");
+            /*
+             * build_data_packet will fill the caller-supplied buffer with a
+             * ready-to-send packet.  Since we are no longer using COBS framing
+             * there is no need to allocate extra space; the packet size is the
+             * size of the packed struct.  Reserve exactly that many bytes and
+             * send them verbatim.
+             */
+            char packet_buf[sizeof(data_packet_t)];
             build_data_packet(packet_buf, trasnmit_encoder_data);
 
-            // Write data to UART
-            uart_write_bytes(uart_num, (const char*)&packet_buf, sizeof(data_packet_t));
+            // Write data to UART (pointer decays to byte pointer automatically)
+            uart_write_bytes(uart_num, packet_buf, sizeof(data_packet_t));
             // const char* test_msg = "Hello from UART\n";
             // size_t msg_length = strlen(test_msg);
             // uart_write_bytes(UART_NUM_0, test_msg, msg_length);
@@ -88,35 +93,20 @@ void uart_send_task(void* arg){
     }
 }
 
-
-// got rid of this in main:
-    // // Wait for packet to be sent
-    // ESP_ERROR_CHECK(uart_wait_tx_done(uart_num, 100)); // wait timeout is 100 RTOS ticks (TickType_t)
-
-    // // Read data from UART.
-    // const uart_port_t uart_num = UART_NUM_2;
-    // uint8_t data[128];
-    // int length = 0;
-    // ESP_ERROR_CHECK(uart_get_buffered_data_len(uart_num, (size_t*)&length));
-    // length = uart_read_bytes(uart_num, data, length, 100);
-
-    // can use this if we want a break signal
-    // // Write data to UART, end with a break signal.
-    // uart_write_bytes_with_break(uart_num, "test break\n",strlen("test break\n"), 100);
-
 void build_data_packet(void *buffer, encoder_data_t encoder_data) {
     
-    static uint16_t seq_num = 0; // value persists throughout calls
+    static uint8_t seq_num = 0; // value persists throughout calls
     //build packets
     data_packet_t packet = {0};
-    ESP_LOGI("COMMS_LOG", "Starting MEMCPY\n");
-    memcpy(&(packet.encoder_data), &encoder_data, sizeof(encoder_data_t));
-    packet.seq = seq_num++;
-    // calculate checksum
+    packet.seq = seq_num++;          // wraps naturally at 255
+    memcpy(&packet.encoder_data, &encoder_data, sizeof(encoder_data_t));
+
+    /* checksum covers the entire packet with the checksum field set to 0 */
     packet.checksum = 0;
-    packet.checksum = calculate_checksum(buffer, (sizeof(data_packet_t)));
-    ESP_LOGI("COMMS_LOG", "Starting COBS\n");
-    cobs_encode(&packet, sizeof(data_packet_t), buffer, sizeof(buffer));
+    packet.checksum = calculate_checksum(&packet, sizeof(data_packet_t));
+
+    memcpy(buffer, &packet, sizeof(data_packet_t));
+    // cobs_encode(&packet, sizeof(data_packet_t), buffer, sizeof(buffer));
 }
 
 uint16_t calculate_checksum(const void *data, size_t len) { // stolen from schmitt if we have any issues 

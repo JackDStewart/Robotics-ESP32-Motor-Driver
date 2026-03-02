@@ -164,7 +164,7 @@ void pcnt_read_task(void *arg) {
             ESP_LOGE(TAG, "pcnt_unit_get_count failed: %s", esp_err_to_name(left_err));
         }
 
-        vTaskDelay(pdMS_TO_TICKS(500));
+        vTaskDelay(pdMS_TO_TICKS(20));
     }
 }
 

@@ -7,6 +7,7 @@
 #include "pcnt_motor_encoder.h"
 #include "comms.h"
 #include "encoder_queue_struct.h"
+#include "esp_log.h"
 
 // in the future we can use xTaskCreatePinnedToCore() creates a task with a particular core affinity. The task's memory is dynamically allocated.
 // More info:
@@ -34,12 +35,15 @@
     // 5. then returns (or idle)
 
 void app_main(void){
-   
+    
     // initialize PCNT module (Step 1)
     encoder_pcnt_init();
 
     // initialize uart transmission (Step 2)
     uart_init();
+    
+    //set log level to ERROR only
+    esp_log_level_set("*", ESP_LOG_ERROR);
 
     // creating a queue
     QueueHandle_t pcnt_tick_queue;
