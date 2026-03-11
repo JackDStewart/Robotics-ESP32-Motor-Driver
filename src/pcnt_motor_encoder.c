@@ -10,8 +10,8 @@
 
 
 // GPIO I decided to use (all on the right side and can change later)
-#define ENCODER_LEFT_A 13
-#define ENCODER_LEFT_B 12
+#define ENCODER_LEFT_A 14           // changed the pin to 14 because 13 is the LED pin for the ESP32
+#define ENCODER_LEFT_B 32           // changed the pin to 32 because 12 was causing an error
 #define ENCODER_RIGHT_A 27
 #define ENCODER_RIGHT_B 33
 
