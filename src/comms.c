@@ -74,16 +74,22 @@ void uart_send_task(void* arg){
         // this current way is blocking until there is a sample available - can change later
         if (xQueueReceive(q, &trasnmit_encoder_data, portMAX_DELAY) == pdTRUE) {
 
-            char packet_buf[sizeof(data_packet_t) + 1]; //+1 for cobs
-            build_data_packet(packet_buf, trasnmit_encoder_data);
+            // char packet_buf[sizeof(data_packet_t) + 1]; //+1 for cobs - changed this
+
+            uint8_t packet_buf[sizeof(data_packet_t) + 2]; // +2 for COBS overhead + zero terminator
+            size_t encoded_len = 0;
+
+            build_data_packet(packet_buf,sizeof(packet_buf) - 1, trasnmit_encoder_data, &encoded_len);
+            packet_buf[encoded_len] = 0x00; // manually append zero terminator
+
 
             // Write data to UART (pointer decays to byte pointer automatically)
-            uart_write_bytes(uart_num, packet_buf, sizeof(data_packet_t));
+            uart_write_bytes(uart_num, packet_buf, encoded_len + 1);
         }
     }
 }
 
-void build_data_packet(void *buffer, encoder_data_t encoder_data) {
+void build_data_packet(void *buffer, size_t buf_size, encoder_data_t encoder_data, size_t *out_len) {
     
     static uint8_t seq_num = 0; // value persists throughout calls
     //build packets
@@ -95,7 +101,12 @@ void build_data_packet(void *buffer, encoder_data_t encoder_data) {
     packet.checksum = 0;
     packet.checksum = calculate_checksum(&packet, sizeof(data_packet_t));
 
-    cobs_encode(buffer, sizeof(buffer), &packet, sizeof(data_packet_t));
+    cobs_encode_result result = cobs_encode(buffer, buf_size, &packet, sizeof(data_packet_t));
+    if (result.status != COBS_ENCODE_OK) {
+        ESP_LOGE("COMMS", "COBS encode failed: %d", result.status);
+    }
+    ESP_LOGI("COMMS", "packet size=%d, buf_size=%d, encoded_len=%d", sizeof(data_packet_t), buf_size, result.out_len);
+    *out_len = result.out_len;
 }
 
 uint16_t calculate_checksum(const void *data, size_t len) { // stolen from schmitt if we have any issues 
