@@ -15,7 +15,7 @@
 #include "comms.h"
 #include "driver/uart.h"
 #include "encoder_queue_struct.h"
-// #include "cobs.h"
+#include "cobs.h"
 
 #define TX_PIN 17
 #define RX_PIN 16
@@ -72,23 +72,13 @@ void uart_send_task(void* arg){
     for (;;){
 
         // this current way is blocking until there is a sample available - can change later
-        if (xQueueReceive(q, &trasnmit_encoder_data, portMAX_DELAY) == pdTRUE){
+        if (xQueueReceive(q, &trasnmit_encoder_data, portMAX_DELAY) == pdTRUE) {
 
-            /*
-             * build_data_packet will fill the caller-supplied buffer with a
-             * ready-to-send packet.  Since we are no longer using COBS framing
-             * there is no need to allocate extra space; the packet size is the
-             * size of the packed struct.  Reserve exactly that many bytes and
-             * send them verbatim.
-             */
-            char packet_buf[sizeof(data_packet_t)];
+            char packet_buf[sizeof(data_packet_t) + 1]; //+1 for cobs
             build_data_packet(packet_buf, trasnmit_encoder_data);
 
             // Write data to UART (pointer decays to byte pointer automatically)
             uart_write_bytes(uart_num, packet_buf, sizeof(data_packet_t));
-            // const char* test_msg = "Hello from UART\n";
-            // size_t msg_length = strlen(test_msg);
-            // uart_write_bytes(UART_NUM_0, test_msg, msg_length);
         }
     }
 }
@@ -105,8 +95,7 @@ void build_data_packet(void *buffer, encoder_data_t encoder_data) {
     packet.checksum = 0;
     packet.checksum = calculate_checksum(&packet, sizeof(data_packet_t));
 
-    memcpy(buffer, &packet, sizeof(data_packet_t));
-    // cobs_encode(&packet, sizeof(data_packet_t), buffer, sizeof(buffer));
+    cobs_encode(buffer, sizeof(buffer), &packet, sizeof(data_packet_t));
 }
 
 uint16_t calculate_checksum(const void *data, size_t len) { // stolen from schmitt if we have any issues 
