@@ -70,6 +70,8 @@ void app_main(void){
         SEND_CORE           // the core we want to use to send       
     );
 
+    // need to create another task for 
+
     // maybe want to be idle (come back to this)
     return;
 }

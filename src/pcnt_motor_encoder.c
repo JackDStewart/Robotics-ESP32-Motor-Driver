@@ -151,8 +151,8 @@ void pcnt_read_task(void *arg) {
 
             // not sure how we want to compute it, but I just have it set to the left_tick
             compute_data.dL = left_delta;
-            compute_data.dR = right_count;
-            compute_data.timestamp_ms = esp_timer_get_time();
+            compute_data.dR = right_delta;
+            compute_data.timestamp_ms = (esp_timer_get_time() / 1000);
 
             // sending the data to the queue
             xQueueSend(q, &compute_data, 0);
