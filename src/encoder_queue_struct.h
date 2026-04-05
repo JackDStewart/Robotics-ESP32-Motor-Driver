@@ -2,6 +2,7 @@
 #pragma once
 #include <stdint.h>
 
+// struct for sending data over uart
 typedef struct {
     int16_t dL;      // delta left
     int16_t dR;     // delta right
@@ -15,3 +16,15 @@ typedef struct {
     uint16_t checksum; 
 
 } __attribute__((packed)) data_packet_t;
+
+
+// struct for receiving data over UART (different parameters)
+typedef struct {
+
+    float target_left_rads;
+    float target_right_rads;
+    uint16_t seq;
+    uint16_t checksum;
+
+} __attribute__((packed)) target_speed_packet_t;
+

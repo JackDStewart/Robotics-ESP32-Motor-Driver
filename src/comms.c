@@ -62,6 +62,7 @@ void uart_init(void){
     ESP_ERROR_CHECK(uart_param_config(uart_num, &uart_config));
 }
 
+// ------------------- FUNCTIONALITY FOR SENDING DATA OVER UART --------------------------------------------
 
 void uart_send_task(void* arg){
 
@@ -108,6 +109,96 @@ void build_data_packet(void *buffer, size_t buf_size, encoder_data_t encoder_dat
     ESP_LOGI("COMMS", "packet size=%d, buf_size=%d, encoded_len=%d", sizeof(data_packet_t), buf_size, result.out_len);
     *out_len = result.out_len;
 }
+// ----------------------------------------------------------------------------------------------------------------------
+
+
+// ------------------- FUNCTIONALITY FOR RECEIVING DATA OVER UART -------------------------------------
+
+void uart_receive_task(void* arg){
+
+    // want to get the data over UART
+    QueueHandle_t q = (QueueHandle_t) arg;
+
+    // want these to persist across multiple iterations
+    static uint8_t read_buf[(sizeof(target_speed_packet_t) + 2) * 4];       // max size in gobilda read function as well (made it four packets)
+    static size_t buf_len = 0;
+
+    for (;;){
+
+        // if there is data over UART
+        int bytes_read = uart_read_bytes(uart_num, read_buf + buf_len, sizeof(read_buf) - buf_len, pdMS_TO_TICKS(10));
+        if (bytes_read > 0){    
+            buf_len += bytes_read;
+        }
+        
+        // finding the 0x00 delimeter
+        int r = 0;
+        uint8_t encoded_frame [TSP_ENCODED_SIZE];
+        bool found_packet = false;
+
+        while (r < buf_len){
+
+            // same logic as the orin code -> 0x00 byte
+            if (!read_buf[r]){
+
+                if (r == 0){
+                    
+                    // the same thing as .erase() in c++
+                    memmove(read_buf, read_buf + 1, buf_len - 1);
+                    buf_len--;
+                    r = 0;
+                    continue;
+                }
+
+                // copying the packet into an encoded frame
+                size_t copy_len = r < TSP_ENCODED_SIZE ? r : TSP_ENCODED_SIZE;
+                memcpy(encoded_frame, read_buf + (r - TSP_ENCODED_SIZE), copy_len);
+
+                // remove bytes between beginning and r and updating the buf_len
+                memmove(read_buf, read_buf + r + 1, buf_len - (r + 1));
+                buf_len = buf_len - (r + 1);
+
+                found_packet = true;
+                break;
+            }
+            r++;
+        }
+
+        // couldn't find a full packet
+        if (!found_packet){
+            continue;
+        }
+
+        target_speed_packet_t tsp;
+
+        if (r != sizeof(encoded_frame)) continue;
+
+        cobs_decode_result res = cobs_decode(&tsp, sizeof(target_speed_packet_t), encoded_frame, sizeof(encoded_frame)); // decode into struct
+        if (res.status != COBS_DECODE_OK){
+            // print some error ESP_LOGE
+            continue;
+        } 
+
+        if (res.out_len != sizeof(target_speed_packet_t)){
+            // print some error ESP_LOGE
+            continue;
+        }
+
+        uint16_t true_checksum = tsp.checksum;
+        tsp.checksum = 0;
+        uint16_t calc_checksum = calculate_checksum(&tsp, sizeof(target_speed_packet_t));
+        
+        // drop the packet
+        if (true_checksum != calc_checksum){
+            // print some error ESP_LOGE
+            continue;
+        }
+
+        // all the checks passed, for now just print the data to the terminal or add to queue
+        xQueueSend(q, &tsp, 0);     // 0 means it won't block when the queue is full
+    }
+}
+
 
 uint16_t calculate_checksum(const void *data, size_t len) { // stolen from schmitt if we have any issues 
     const uint8_t *bytes = (const uint8_t *)data;

@@ -24,8 +24,11 @@
 // Core 0 is solely responsible for keeping time in IDF FreeRTOS. Therefore, anything that prevents Core 0 from incrementing the tick count, such as 
 // suspending the scheduler on Core 0, will cause the entire scheduler's timekeeping to lag behind.
 
-#define SEND_CORE 1
-#define COMPUTE_CORE 0
+// #define SEND_CORE 1
+// #define COMPUTE_CORE 0
+
+#define INBOUND_FLOW_CORE 1
+#define OUTBOUND_FLOW_CORE 0
 
 // tasks to be done in main:
     // 1. initialize PCNT module (done)
@@ -45,9 +48,13 @@ void app_main(void){
     //set log level to ERROR only
     esp_log_level_set("*", ESP_LOG_ERROR);
 
-    // creating a queue
+    // creating a queue for PCNT ticks
     QueueHandle_t pcnt_tick_queue;
     pcnt_tick_queue = xQueueCreate(32, sizeof(encoder_data_t));     // chose a random number (I chose to keep 32 samples at once - can change later)
+
+    // creating a queue to receive data from UART
+    QueueHandle_t target_speed_queue;
+    target_speed_queue = xQueueCreate(32, sizeof(target_speed_packet_t));
 
     // we are going to use this one in the future because we want to use both cores on the ESP32
     xTaskCreatePinnedToCore(
@@ -57,7 +64,7 @@ void app_main(void){
         pcnt_tick_queue,    // args
         5,                  // priority value (5 = medium priority)
         NULL,               // task handle (kill or suspend task later)
-        COMPUTE_CORE        // the core we want to use to compute       
+        OUTBOUND_FLOW_CORE        // the core we want to use to compute       
     );
 
     xTaskCreatePinnedToCore(
@@ -67,10 +74,28 @@ void app_main(void){
         pcnt_tick_queue,    // args
         5,                  // priority value (5 = medium priority)
         NULL,               // task handle (kill or suspend task later)
-        SEND_CORE           // the core we want to use to send       
+        OUTBOUND_FLOW_CORE           // the core we want to use to send       
     );
 
-    // need to create another task for 
+    xTaskCreatePinnedToCore(
+        uart_receive_task,     // task function
+        "uart_receive_task",   // name of task
+        4096,               // stack size in bytes
+        target_speed_queue,    // args
+        5,                  // priority value (5 = medium priority)
+        NULL,               // task handle (kill or suspend task later)
+        INBOUND_FLOW_CORE           // the core we want to use to send       
+    );
+
+    // xTaskCreatePinnedToCore(
+    //     uart_send_task,     // task function
+    //     "uart_send_task",   // name of task
+    //     4096,               // stack size in bytes
+    //     target_speed_queue,    // args
+    //     5,                  // priority value (5 = medium priority)
+    //     NULL,               // task handle (kill or suspend task later)
+    //     INBOUND_FLOW_CORE           // the core we want to use to send       
+    // );
 
     // maybe want to be idle (come back to this)
     return;
