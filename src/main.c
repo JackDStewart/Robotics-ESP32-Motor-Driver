@@ -56,6 +56,8 @@ void app_main(void){
     //set log level to ERROR only
     esp_log_level_set("*", ESP_LOG_ERROR);
 
+    // TODO: check if pcnt_tick_queue, target_speed_queue, and vel_mutex fail. Also can later change the stack size to 8192 from 4096 if ther is overflow
+
     // creating a queue for PCNT ticks
     QueueHandle_t pcnt_tick_queue;
     pcnt_tick_queue = xQueueCreate(32, sizeof(encoder_data_t));     // chose a random number (I chose to keep 32 samples at once - can change later)
@@ -93,7 +95,7 @@ void app_main(void){
         "uart_receive_task",    // name of task
         4096,                   // stack size in bytes
         target_speed_queue,     // args
-        5,                      // priority value (5 = medium priority)
+        6,                      // priority value (5 = medium priority)
         NULL,                   // task handle (kill or suspend task later)
         INBOUND_FLOW_CORE       // the core we want to use to send       
     );
@@ -103,11 +105,11 @@ void app_main(void){
         "pi_task",              // name of task
         4096,                   // stack size in bytes
         target_speed_queue,     // args
-        5,                      // priority value (5 = medium priority)
+        7,                      // priority value (5 = medium priority)
         NULL,                   // task handle (kill or suspend task later)
         INBOUND_FLOW_CORE       // the core we want to use to send       
     );
 
-    // maybe want to be idle (come back to this)
-    return;
+    // deleting the app_main task
+    vTaskDelete(NULL);
 }
