@@ -147,11 +147,13 @@ void pi_task(void* arg){
         left_out = pid_controller_update(&left_wheel, tsp.target_left_rads, local_velocity_left);
         right_out = pid_controller_update(&right_wheel, tsp.target_right_rads, local_velocity_right);
 
+        // will unvoid them once we complete the TODOs below
+        (void)left_out;
+        (void)right_out;
 
         // TODO: figure out the motor driver interface
         // TODO: need to add the feedforward term
         // TODO: Apply the result to the PWM for each motor
-
     }
 
 }
