@@ -200,6 +200,7 @@ void uart_receive_task(void* arg){
     }
 }
 
+// -----------------------------------------------------------------------------------------------------
 
 uint16_t calculate_checksum(const void *data, size_t len) { // stolen from schmitt if we have any issues 
     const uint8_t *bytes = (const uint8_t *)data;
