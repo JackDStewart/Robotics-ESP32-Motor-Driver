@@ -2,6 +2,11 @@
 #pragma once
 #include <stdint.h>
 
+extern SemaphoreHandle_t vel_mutex;
+extern float shared_velocity_left;
+extern float shared_velocity_right;
+
+
 // struct for sending data over uart
 typedef struct {
     int16_t dL;      // delta left

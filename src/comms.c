@@ -12,8 +12,9 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "esp_log.h"
-#include "comms.h"
 #include "driver/uart.h"
+
+#include "comms.h"
 #include "encoder_queue_struct.h"
 #include "cobs.h"
 
@@ -133,7 +134,7 @@ void uart_receive_task(void* arg){
         
         // finding the 0x00 delimeter
         int r = 0;
-        uint8_t encoded_frame [TSP_ENCODED_SIZE];
+        uint8_t encoded_frame[TSP_ENCODED_SIZE];
         bool found_packet = false;
 
         while (r < buf_len){
@@ -151,7 +152,7 @@ void uart_receive_task(void* arg){
                 }
 
                 // copying the packet into an encoded frame
-                size_t copy_len = r < TSP_ENCODED_SIZE ? r : TSP_ENCODED_SIZE;
+                size_t copy_len = (r < TSP_ENCODED_SIZE) ? r : TSP_ENCODED_SIZE;
                 memcpy(encoded_frame, read_buf + (r - TSP_ENCODED_SIZE), copy_len);
 
                 // remove bytes between beginning and r and updating the buf_len

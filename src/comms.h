@@ -2,7 +2,7 @@
 #include "encoder_queue_struct.h"
 
 
-#define TSP_ENCODED_SIZE = sizeof(target_speed_packet_t) + 1; // +1 for COBS overhead
+#define TSP_ENCODED_SIZE sizeof(target_speed_packet_t) + 1 // +1 for COBS overhead
 
 void uart_init(void);
 void uart_send_task(void* args);

@@ -4,10 +4,13 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "esp_timer.h"
+#include "esp_log.h"
+
 #include "pcnt_motor_encoder.h"
 #include "comms.h"
+#include "pi_controller.h"
 #include "encoder_queue_struct.h"
-#include "esp_log.h"
+
 
 // in the future we can use xTaskCreatePinnedToCore() creates a task with a particular core affinity. The task's memory is dynamically allocated.
 // More info:
@@ -29,6 +32,11 @@
 
 #define INBOUND_FLOW_CORE 1
 #define OUTBOUND_FLOW_CORE 0
+
+SemaphoreHandle_t vel_mutex;
+float shared_velocity_left = 0.0f;
+float shared_velocity_right = 0.0f;
+
 
 // tasks to be done in main:
     // 1. initialize PCNT module (done)
@@ -56,46 +64,49 @@ void app_main(void){
     QueueHandle_t target_speed_queue;
     target_speed_queue = xQueueCreate(32, sizeof(target_speed_packet_t));
 
+    // create mutex before starting tasks (need a mutex because I am accessing )
+    vel_mutex = xSemaphoreCreateMutex();
+
     // we are going to use this one in the future because we want to use both cores on the ESP32
     xTaskCreatePinnedToCore(
-        pcnt_read_task,     // task function
-        "pcnt_read_task",   // name of task
-        4096,               // stack size in bytes
-        pcnt_tick_queue,    // args
-        5,                  // priority value (5 = medium priority)
-        NULL,               // task handle (kill or suspend task later)
-        OUTBOUND_FLOW_CORE        // the core we want to use to compute       
+        pcnt_read_task,         // task function
+        "pcnt_read_task",       // name of task
+        4096,                   // stack size in bytes
+        pcnt_tick_queue,        // args
+        5,                      // priority value (5 = medium priority)
+        NULL,                   // task handle (kill or suspend task later)
+        OUTBOUND_FLOW_CORE      // the core we want to use to compute       
     );
 
     xTaskCreatePinnedToCore(
-        uart_send_task,     // task function
-        "uart_send_task",   // name of task
-        4096,               // stack size in bytes
-        pcnt_tick_queue,    // args
-        5,                  // priority value (5 = medium priority)
-        NULL,               // task handle (kill or suspend task later)
-        OUTBOUND_FLOW_CORE           // the core we want to use to send       
+        uart_send_task,         // task function
+        "uart_send_task",       // name of task
+        4096,                   // stack size in bytes
+        pcnt_tick_queue,        // args
+        5,                      // priority value (5 = medium priority)
+        NULL,                   // task handle (kill or suspend task later)
+        OUTBOUND_FLOW_CORE      // the core we want to use to send       
     );
 
     xTaskCreatePinnedToCore(
-        uart_receive_task,     // task function
-        "uart_receive_task",   // name of task
-        4096,               // stack size in bytes
-        target_speed_queue,    // args
-        5,                  // priority value (5 = medium priority)
-        NULL,               // task handle (kill or suspend task later)
-        INBOUND_FLOW_CORE           // the core we want to use to send       
+        uart_receive_task,      // task function
+        "uart_receive_task",    // name of task
+        4096,                   // stack size in bytes
+        target_speed_queue,     // args
+        5,                      // priority value (5 = medium priority)
+        NULL,                   // task handle (kill or suspend task later)
+        INBOUND_FLOW_CORE       // the core we want to use to send       
     );
 
-    // xTaskCreatePinnedToCore(
-    //     uart_send_task,     // task function
-    //     "uart_send_task",   // name of task
-    //     4096,               // stack size in bytes
-    //     target_speed_queue,    // args
-    //     5,                  // priority value (5 = medium priority)
-    //     NULL,               // task handle (kill or suspend task later)
-    //     INBOUND_FLOW_CORE           // the core we want to use to send       
-    // );
+    xTaskCreatePinnedToCore(
+        pi_task,                // task function
+        "pi_task",              // name of task
+        4096,                   // stack size in bytes
+        target_speed_queue,     // args
+        5,                      // priority value (5 = medium priority)
+        NULL,                   // task handle (kill or suspend task later)
+        INBOUND_FLOW_CORE       // the core we want to use to send       
+    );
 
     // maybe want to be idle (come back to this)
     return;

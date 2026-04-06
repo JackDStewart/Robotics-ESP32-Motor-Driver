@@ -4,9 +4,11 @@
 #include "esp_log.h"
 #include "driver/pulse_cnt.h"
 #include "driver/gpio.h"
+#include <math.h>
+#include "esp_timer.h"
+
 #include "pcnt_motor_encoder.h"
 #include "encoder_queue_struct.h"
-#include "esp_timer.h"
 
 
 // GPIO I decided to use (all on the right side and can change later)
@@ -156,6 +158,14 @@ void pcnt_read_task(void *arg) {
 
             // sending the data to the queue
             xQueueSend(q, &compute_data, 0);
+
+            // write to shared variable
+            if (xSemaphoreTake(vel_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+
+                shared_velocity_left = (compute_data.dL / 537.7) * 2 * M_PI / 0.02f;
+                shared_velocity_right = (compute_data.dR / 537.7) * 2 * M_PI / 0.02f;
+                xSemaphoreGive(vel_mutex);
+            }
 
             // If you want a "rate", delta per 0.5s -> ticks/sec = delta * 2
             ESP_LOGI(TAG, "left count=%d  left delta(500ms)=%d  left approx ticks/s=%d, right count=%d  right delta(500ms)=%d  right approx ticks/s=%d",
