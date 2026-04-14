@@ -28,7 +28,7 @@ typedef struct {
 
     float target_left_rads;
     float target_right_rads;
-    uint16_t seq;
+    uint8_t seq;
     uint16_t checksum;
 
 } __attribute__((packed)) target_speed_packet_t;

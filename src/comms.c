@@ -120,16 +120,13 @@ void uart_receive_task(void* arg){
 
     for (;;){
         if (xQueueReceive(uart_q, &event, portMAX_DELAY)) {
-            ESP_LOGI("REC", "UART int rec");
             if (event.type != UART_DATA) continue;
-            ESP_LOGI("REC", "DATA int");
             // if there is data over UART
             int bytes_read = uart_read_bytes(uart_num, read_buf + buf_len, sizeof(read_buf) - buf_len, pdMS_TO_TICKS(10));
             if (bytes_read > 0){    
                 buf_len += bytes_read;
             }
-            ESP_LOGI("REC", "%x bytes read", bytes_read);
-        
+
             // finding the 0x00 delimeter
             int r = 0;
             uint8_t encoded_frame[TSP_ENCODED_SIZE];
@@ -168,14 +165,18 @@ void uart_receive_task(void* arg){
                 continue;
             }
 
-            ESP_LOGI("REC", "found packet");
+            // ESP_LOGI("REC", "found rad/s packet");
             target_speed_packet_t tsp;
 
-            if (r != sizeof(encoded_frame)) continue;
+            if (r != sizeof(encoded_frame)){
+                continue;
+            }
+
 
             cobs_decode_result res = cobs_decode(&tsp, sizeof(target_speed_packet_t), encoded_frame, sizeof(encoded_frame)); // decode into struct
+            ESP_LOGI("REC", "packet info: left=%f, right=%f, seq=%u", tsp.target_left_rads, tsp.target_right_rads, tsp.seq);
             if (res.status != COBS_DECODE_OK){
-                ESP_LOGE("REC", "Decode error");
+                ESP_LOGE("REC", "Decode error: %x", res.status);
                 continue;
             } 
 
