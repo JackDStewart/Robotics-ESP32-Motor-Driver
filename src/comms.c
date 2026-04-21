@@ -147,11 +147,19 @@ void uart_receive_task(void* arg){
                     }
 
                     // copying the packet into an encoded frame
-                    size_t copy_len = (r < TSP_ENCODED_SIZE) ? r : TSP_ENCODED_SIZE;
-                    memcpy(encoded_frame, read_buf + (r - TSP_ENCODED_SIZE), copy_len);
+                    // size_t copy_len = (r < TSP_ENCODED_SIZE) ? r : TSP_ENCODED_SIZE;
 
-                    // remove bytes between beginning and r and updating the buf_len
-                    memmove(read_buf, read_buf + r + 1, buf_len - (r + 1));
+                    // frame is read_buf[0..r-1], length is exactly r bytes
+                    if (r != TSP_ENCODED_SIZE) {
+                        // wrong size, discard up to and including the 0x00
+                        memmove(read_buf, read_buf + r + 1, buf_len - (r + 1));
+                        buf_len -= (r + 1);
+                        continue;
+                    }
+
+                    memcpy(encoded_frame, read_buf , r);
+                    memmove(read_buf, read_buf + r + 1, buf_len - (r + 1));     // remove bytes between beginning and r and updating the buf_len
+
                     buf_len = buf_len - (r + 1);
 
                     found_packet = true;
