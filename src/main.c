@@ -32,6 +32,7 @@
 
 #define INBOUND_FLOW_CORE 1
 #define OUTBOUND_FLOW_CORE 0
+#define APP_TASK_STACK_SIZE 4096
 
 SemaphoreHandle_t vel_mutex;
 float shared_velocity_left = 0.0f;
@@ -57,8 +58,6 @@ void app_main(void){
     esp_log_level_set("*", ESP_LOG_VERBOSE);
     // esp_log_level_set("*", ESP_LOG_ERROR);
 
-    // TODO: check if pcnt_tick_queue, target_speed_queue, and vel_mutex fail. Also can later change the stack size to 8192 from 4096 if ther is overflow
-
     // creating a queue for PCNT ticks
     QueueHandle_t pcnt_tick_queue;
     pcnt_tick_queue = xQueueCreate(32, sizeof(encoder_data_t));     // chose a random number (I chose to keep 32 samples at once - can change later)
@@ -69,6 +68,12 @@ void app_main(void){
 
     // create mutex before starting tasks (need a mutex because I am accessing )
     vel_mutex = xSemaphoreCreateMutex();
+
+    if (pcnt_tick_queue == NULL || target_speed_queue == NULL || vel_mutex == NULL) {
+        ESP_LOGE("app_main", "Failed to create pcnt_tick_queue, target_speed_queue, or vel_mutex");
+        vTaskDelete(NULL);
+        return;
+    }
 
     // // we are going to use this one in the future because we want to use both cores on the ESP32
     // xTaskCreatePinnedToCore(
@@ -94,7 +99,7 @@ void app_main(void){
     xTaskCreatePinnedToCore(
         uart_receive_task,      // task function
         "uart_receive_task",    // name of task
-        4096,                   // stack size in bytes
+        APP_TASK_STACK_SIZE,    // stack size in bytes (increase to 8192 if overflow is observed)
         target_speed_queue,     // args
         6,                      // priority value (5 = medium priority)
         NULL,                   // task handle (kill or suspend task later)
@@ -104,7 +109,7 @@ void app_main(void){
     xTaskCreatePinnedToCore(
         pi_task,                // task function
         "pi_task",              // name of task
-        4096,                   // stack size in bytes
+        APP_TASK_STACK_SIZE,    // stack size in bytes (increase to 8192 if overflow is observed)
         target_speed_queue,     // args
         7,                      // priority value (5 = medium priority)
         NULL,                   // task handle (kill or suspend task later)

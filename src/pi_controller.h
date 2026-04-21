@@ -1,3 +1,14 @@
+#include "driver/mcpwm_timer.h"
+#include "driver/mcpwm_oper.h"
+#include "driver/mcpwm_cmpr.h"
+#include "driver/mcpwm_gen.h"
+
+#define PWM_NEUTRAL 1500
+#define PWM_MAX_FORWARD 1950
+#define PWM_MAX_REVERSE 1050
+
+#define LEFT_MOTOR_GPIO 25 //pin A1
+#define RIGHT_MOTOR_GPIO 26 //pin A0
 
 typedef struct {
 
@@ -29,6 +40,7 @@ typedef struct {
 
 // functions for PID control
 void pid_controller_init(pid_controller_t *pid);
+void pwm_init(mcpwm_cmpr_handle_t *left_cmp, mcpwm_cmpr_handle_t *right_cmp);
 float pid_controller_update(pid_controller_t *pid, float setpoint, float measurement);
 void pi_reset(pid_controller_t *pid);
 void pi_task(void* arg);
