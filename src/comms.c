@@ -111,6 +111,9 @@ void build_data_packet(void *buffer, size_t buf_size, encoder_data_t encoder_dat
 void uart_receive_task(void* arg){
     uart_event_t event;
 
+    static bool first = true;
+    static uint8_t prev_seq;
+
     // want to get the data over UART
     QueueHandle_t tsp_q = (QueueHandle_t) arg;
 
@@ -147,12 +150,17 @@ void uart_receive_task(void* arg){
                     }
 
                     // copying the packet into an encoded frame
-                    size_t copy_len = (r < TSP_ENCODED_SIZE) ? r : TSP_ENCODED_SIZE;
-                    memcpy(encoded_frame, read_buf + (r - TSP_ENCODED_SIZE), copy_len);
+                    if (r != TSP_ENCODED_SIZE) {
+                        // wrong size frame, discard it
+                        memmove(read_buf, read_buf + r + 1, buf_len - (r + 1));
+                        buf_len -= (r + 1);
+                        r = 0;
+                        continue;
+                    }
+                    memcpy(encoded_frame, read_buf, TSP_ENCODED_SIZE);
 
-                    // remove bytes between beginning and r and updating the buf_len
                     memmove(read_buf, read_buf + r + 1, buf_len - (r + 1));
-                    buf_len = buf_len - (r + 1);
+                    buf_len -= (r + 1);
 
                     found_packet = true;
                     break;
@@ -174,7 +182,6 @@ void uart_receive_task(void* arg){
 
 
             cobs_decode_result res = cobs_decode(&tsp, sizeof(target_speed_packet_t), encoded_frame, sizeof(encoded_frame)); // decode into struct
-            ESP_LOGI("REC", "packet info: left=%f, right=%f, seq=%u", tsp.target_left_rads, tsp.target_right_rads, tsp.seq);
             if (res.status != COBS_DECODE_OK){
                 ESP_LOGE("REC", "Decode error: %x", res.status);
                 continue;
@@ -185,21 +192,22 @@ void uart_receive_task(void* arg){
                 continue;
             }
 
-            
-            
-            uint16_t true_checksum = tsp.checksum;
+            uint16_t exp_checksum = tsp.checksum;
             tsp.checksum = 0;
             uint16_t calc_checksum = calculate_checksum(&tsp, sizeof(target_speed_packet_t));
             
             // drop the packet
-            if (true_checksum != calc_checksum){
+            if (exp_checksum != calc_checksum){
                 ESP_LOGE("REC", "Checksum mismatch");
                 continue;
             }
-            
-            ESP_LOGI("REC", "no errors");
+            if (first) prev_seq = tsp.seq;
+            if (!first && tsp.seq != (uint8_t)(prev_seq + 1)) {
+                // alert if out of order
+                ESP_LOGE("REC", "skipped seq - previous %u, current%u", prev_seq, tsp.seq);
+            }
             ESP_LOGI("REC", "packet info: left=%f, right=%f, seq=%u", tsp.target_left_rads, tsp.target_right_rads, tsp.seq);
-
+            
             // all the checks passed, for now just print the data to the terminal or add to queue
             xQueueSend(tsp_q, &tsp, 0);     // 0 means it won't block when the queue is full
         }
