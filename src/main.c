@@ -55,6 +55,7 @@ void app_main(void){
     
     //set log level to ERROR only
     esp_log_level_set("*", ESP_LOG_VERBOSE);
+    // esp_log_level_set("*", ESP_LOG_ERROR);
 
     // TODO: check if pcnt_tick_queue, target_speed_queue, and vel_mutex fail. Also can later change the stack size to 8192 from 4096 if ther is overflow
 
@@ -69,7 +70,7 @@ void app_main(void){
     // create mutex before starting tasks (need a mutex because I am accessing )
     vel_mutex = xSemaphoreCreateMutex();
 
-    // we are going to use this one in the future because we want to use both cores on the ESP32
+    // // we are going to use this one in the future because we want to use both cores on the ESP32
     // xTaskCreatePinnedToCore(
     //     pcnt_read_task,         // task function
     //     "pcnt_read_task",       // name of task
