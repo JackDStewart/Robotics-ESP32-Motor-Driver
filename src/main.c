@@ -55,8 +55,8 @@ void app_main(void){
     uart_init();
     
     //set log level to ERROR only
-    esp_log_level_set("*", ESP_LOG_VERBOSE);
-    // esp_log_level_set("*", ESP_LOG_ERROR);
+    // esp_log_level_set("*", ESP_LOG_VERBOSE);
+    esp_log_level_set("*", ESP_LOG_ERROR);
 
     // creating a queue for PCNT ticks
     QueueHandle_t pcnt_tick_queue;

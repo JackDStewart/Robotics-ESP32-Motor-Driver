@@ -206,7 +206,8 @@ void uart_receive_task(void* arg){
                 // alert if out of order
                 ESP_LOGE("REC", "skipped seq - previous %u, current%u", prev_seq, tsp.seq);
             }
-            ESP_LOGI("REC", "packet info: left=%f, right=%f, seq=%u", tsp.target_left_rads, tsp.target_right_rads, tsp.seq);
+            // ESP_LOGI("REC", "packet info: left=%f, right=%f, seq=%u", tsp.target_left_rads, tsp.target_right_rads, tsp.seq);
+            ESP_LOGE("REC", "decoded: left=%f right=%f", tsp.target_left_rads, tsp.target_right_rads);
             
             // all the checks passed, for now just print the data to the terminal or add to queue
             xQueueSend(tsp_q, &tsp, 0);     // 0 means it won't block when the queue is full

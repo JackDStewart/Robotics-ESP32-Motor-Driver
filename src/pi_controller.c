@@ -7,7 +7,7 @@
 #include "encoder_queue_struct.h"
 
 
-
+// --------------------------- PID and PWM Init Functions  ------------------------------------------
 void pid_controller_init(pid_controller_t *pid){
 
     // clearing controller mem vars
@@ -105,7 +105,9 @@ void pwm_init(mcpwm_cmpr_handle_t *left_cmp, mcpwm_cmpr_handle_t *right_cmp) {
     ESP_ERROR_CHECK(mcpwm_timer_enable(timer));
     ESP_ERROR_CHECK(mcpwm_timer_start_stop(timer, MCPWM_TIMER_START_NO_STOP));
 }
+// ---------------------------------------------------------------------------------------------------
 
+// ----------------- PI controller logic ------------------------------------------------------------
 float pid_controller_update(pid_controller_t *pid, float setpoint, float measurement){
 
     // error signal
@@ -115,7 +117,10 @@ float pid_controller_update(pid_controller_t *pid, float setpoint, float measure
     float proportional = pid->Kp * error;
 
     // Integral
-    pid->integrator = pid->integrator + (0.5f * (pid->Ki * pid->T * (error + pid->prevError)));
+    if (pid->Ki == 0.0f) {
+        pid->integrator = 0.0f;
+    }
+    // pid->integrator = pid->integrator + (0.5f * (pid->Ki * pid->T * (error + pid->prevError)));
 
     // Anti-windup via dynamic clamping
     float limMinInt, limMaxInt;
@@ -136,14 +141,14 @@ float pid_controller_update(pid_controller_t *pid, float setpoint, float measure
         limMinInt = 0.0f;
     }
 
-
-    // clamp integrator
-    if (pid->integrator > limMaxInt){
-        pid->integrator = limMaxInt;
-    }
-    else if (pid->integrator < limMinInt){
-        pid->integrator = limMinInt;
-    }
+    // causing integral windup for now
+    // // clamp integrator
+    // if (pid->integrator > limMaxInt){
+    //     pid->integrator = limMaxInt;
+    // }
+    // else if (pid->integrator < limMinInt){
+    //     pid->integrator = limMinInt;
+    // }
 
 
     // derivative (band-limited differentiator)
@@ -202,20 +207,24 @@ void pi_task(void* arg){
     // Set your Kp, Ki, T, limMin, limMax values on both structs (need to tune these by testing)
     // left wheel
     left_wheel.Kp = 1.0f;
-    left_wheel.Ki = 0.1f;
+    left_wheel.Ki = 0.0f;
     left_wheel.T = 0.02f;
+    left_wheel.limMin = -(PWM_NEUTRAL - PWM_MAX_REVERSE);
+    left_wheel.limMax = PWM_MAX_FORWARD - PWM_NEUTRAL;
     // need to set the limMin and limMax once we know what the PWM output range is
 
     // right wheel
     right_wheel.Kp = 1.0f;
-    right_wheel.Ki = 0.1f;
+    right_wheel.Ki = 0.0f;
     right_wheel.T = 0.02f;
+    right_wheel.limMin = -(PWM_NEUTRAL - PWM_MAX_REVERSE);
+    right_wheel.limMax = PWM_MAX_FORWARD - PWM_NEUTRAL;
     // need to set the limMin and limMax once we know what the PWM output range is
 
 
     // Note on tuning: The tuning process is iterative — start with Ki = 0 and tune Kp until the response is fast but not oscillating, then slowly increase Ki until steady state error disappears.
 
-    target_speed_packet_t tsp;
+    target_speed_packet_t tsp = {0};
     float local_velocity_left = 0, local_velocity_right = 0;
     float left_out = 0, right_out = 0;
 
@@ -226,7 +235,15 @@ void pi_task(void* arg){
         vTaskDelay(pdMS_TO_TICKS(20));
 
         // if new data arrives
-        xQueueReceive(q, &tsp, 0);
+        if (xQueueReceive(q, &tsp, pdMS_TO_TICKS(100)) != pdTRUE){
+            
+            // no packet received in 100ms (added a timeout)
+            mcpwm_comparator_set_compare_value(left_cmp, PWM_NEUTRAL);
+            mcpwm_comparator_set_compare_value(right_cmp, PWM_NEUTRAL);
+            pi_reset(&left_wheel);
+            pi_reset(&right_wheel);
+            continue;
+        }
 
         if (xSemaphoreTake(vel_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
 
@@ -238,9 +255,13 @@ void pi_task(void* arg){
         left_out = pid_controller_update(&left_wheel, tsp.target_left_rads, local_velocity_left);
         right_out = pid_controller_update(&right_wheel, tsp.target_right_rads, local_velocity_right);
 
-        // will unvoid them once we complete the TODOs below
-        (void)left_out;
-        (void)right_out;
+        // applying PI output to the comparator
+        uint32_t left_pwm = (uint32_t) (PWM_NEUTRAL + left_out);
+        uint32_t right_pwm = (uint32_t) (PWM_NEUTRAL + right_out);
+
+        //
+        mcpwm_comparator_set_compare_value(left_cmp,  left_pwm);
+        mcpwm_comparator_set_compare_value(right_cmp, right_pwm);
 
         // TODO: figure out the motor driver interface
         // TODO: need to add the feedforward term
