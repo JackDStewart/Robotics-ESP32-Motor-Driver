@@ -142,13 +142,13 @@ float pid_controller_update(pid_controller_t *pid, float setpoint, float measure
     }
 
     // causing integral windup for now
-    // // clamp integrator
-    // if (pid->integrator > limMaxInt){
-    //     pid->integrator = limMaxInt;
-    // }
-    // else if (pid->integrator < limMinInt){
-    //     pid->integrator = limMinInt;
-    // }
+    // clamp integrator
+    if (pid->integrator > limMaxInt){
+        pid->integrator = limMaxInt;
+    }
+    else if (pid->integrator < limMinInt){
+        pid->integrator = limMinInt;
+    }
 
 
     // derivative (band-limited differentiator)
@@ -228,11 +228,32 @@ void pi_task(void* arg){
     float local_velocity_left = 0, local_velocity_right = 0;
     float left_out = 0, right_out = 0;
 
+    uint32_t left_width = 0, right_width = 0; 
+
+    for (;;){
+
+        // // left and right have the same T (20ms)
+        // vTaskDelay(pdMS_TO_TICKS(20));
+
+        // if new data arrives
+        if (xQueueReceive(q, &tsp, portMAX_DELAY) == pdTRUE){
+            
+            left_width = tsp.target_left_rads * 79.2 + PWM_NEUTRAL;
+            right_width = tsp.target_right_rads * 79.2 + PWM_NEUTRAL;
+
+            // no packet received in 100ms (added a timeout)
+            mcpwm_comparator_set_compare_value(left_cmp, left_width);
+            mcpwm_comparator_set_compare_value(right_cmp, right_width);
+        }
+
+    }
+
+
     // forever loop
     for (;;){
 
         // left and right have the same T (20ms)
-        vTaskDelay(pdMS_TO_TICKS(20));
+        // vTaskDelay(pdMS_TO_TICKS(20));
 
         // if new data arrives
         if (xQueueReceive(q, &tsp, pdMS_TO_TICKS(100)) != pdTRUE){
