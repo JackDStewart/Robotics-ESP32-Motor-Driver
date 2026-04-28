@@ -209,18 +209,15 @@ void pi_task(void* arg){
     left_wheel.Kp = 1.0f;
     left_wheel.Ki = 0.0f;
     left_wheel.T = 0.02f;
-    left_wheel.limMin = -(PWM_NEUTRAL - PWM_MAX_REVERSE);
-    left_wheel.limMax = PWM_MAX_FORWARD - PWM_NEUTRAL;
-    // need to set the limMin and limMax once we know what the PWM output range is
+    left_wheel.limMin = PWM_MIN - PWM_NEUTRAL;
+    left_wheel.limMax = PWM_MAX - PWM_NEUTRAL;
 
     // right wheel
     right_wheel.Kp = 1.0f;
     right_wheel.Ki = 0.0f;
     right_wheel.T = 0.02f;
-    right_wheel.limMin = -(PWM_NEUTRAL - PWM_MAX_REVERSE);
-    right_wheel.limMax = PWM_MAX_FORWARD - PWM_NEUTRAL;
-    // need to set the limMin and limMax once we know what the PWM output range is
-
+    right_wheel.limMin = PWM_MIN - PWM_NEUTRAL;
+    right_wheel.limMax = PWM_MAX - PWM_NEUTRAL;
 
     // Note on tuning: The tuning process is iterative — start with Ki = 0 and tune Kp until the response is fast but not oscillating, then slowly increase Ki until steady state error disappears.
 
@@ -231,10 +228,6 @@ void pi_task(void* arg){
     uint32_t left_width = 0, right_width = 0; 
 
     for (;;){
-
-        // // left and right have the same T (20ms)
-        // vTaskDelay(pdMS_TO_TICKS(20));
-
         // if new data arrives
         if (xQueueReceive(q, &tsp, portMAX_DELAY) == pdTRUE){
             
@@ -245,15 +238,10 @@ void pi_task(void* arg){
             mcpwm_comparator_set_compare_value(left_cmp, left_width);
             mcpwm_comparator_set_compare_value(right_cmp, right_width);
         }
-
     }
-
 
     // forever loop
     for (;;){
-
-        // left and right have the same T (20ms)
-        // vTaskDelay(pdMS_TO_TICKS(20));
 
         // if new data arrives
         if (xQueueReceive(q, &tsp, pdMS_TO_TICKS(100)) != pdTRUE){

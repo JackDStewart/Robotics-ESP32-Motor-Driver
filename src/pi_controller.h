@@ -4,11 +4,14 @@
 #include "driver/mcpwm_gen.h"
 
 #define PWM_NEUTRAL 1500
-#define PWM_MAX_FORWARD 1950
-#define PWM_MAX_REVERSE 1050
+#define PWM_MAX 1950
+#define PWM_MIN 1050
 
 #define LEFT_MOTOR_GPIO 25 //pin A1
 #define RIGHT_MOTOR_GPIO 26 //pin A0
+
+extern float shared_velocity_left;
+extern float shared_velocity_right;
 
 typedef struct {
 
