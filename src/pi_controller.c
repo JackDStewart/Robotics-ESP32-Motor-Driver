@@ -6,6 +6,11 @@
 #include "pi_controller.h"
 #include "encoder_queue_struct.h"
 
+#include <math.h>
+
+#define GAIN 0.082
+#define STARTING_KP (1/GAIN)
+
 
 // --------------------------- PID and PWM Init Functions  ------------------------------------------
 void pid_controller_init(pid_controller_t *pid){
@@ -120,36 +125,38 @@ float pid_controller_update(pid_controller_t *pid, float setpoint, float measure
     if (pid->Ki == 0.0f) {
         pid->integrator = 0.0f;
     }
-    // pid->integrator = pid->integrator + (0.5f * (pid->Ki * pid->T * (error + pid->prevError)));
-
-    // Anti-windup via dynamic clamping
-    float limMinInt, limMaxInt;
-
-    // compute integrator limits (figure out the limits)
-    if (pid->limMax > proportional){
-
-        limMaxInt = pid->limMax - proportional;
-    }
     else {
-        limMaxInt = 0.0f;
-    }
+        pid->integrator = pid->integrator + (0.5f * (pid->Ki * pid->T * (error + pid->prevError)));
+    
 
-    if (pid->limMin < proportional){
-        limMinInt = proportional - pid->limMin;
-    }
-    else {
-        limMinInt = 0.0f;
-    }
+        // Anti-windup via dynamic clamping
+        float limMinInt, limMaxInt;
 
-    // causing integral windup for now
-    // clamp integrator
-    if (pid->integrator > limMaxInt){
-        pid->integrator = limMaxInt;
-    }
-    else if (pid->integrator < limMinInt){
-        pid->integrator = limMinInt;
-    }
+        // compute integrator limits (figure out the limits)
+        if (pid->limMax > proportional){
 
+            limMaxInt = pid->limMax - proportional;
+        }
+        else {
+            limMaxInt = 0.0f;
+        }
+
+        if (pid->limMin < proportional){
+            limMinInt = proportional - pid->limMin;
+        }
+        else {
+            limMinInt = 0.0f;
+        }
+
+        // causing integral windup for now
+        // clamp integrator
+        if (pid->integrator > limMaxInt){
+            pid->integrator = limMaxInt;
+        }
+        else if (pid->integrator < limMinInt){
+            pid->integrator = limMinInt;
+        }
+    }
 
     // derivative (band-limited differentiator)
     // pid->differentiator = (2.0f * pid->Kd * (measurement - pid->prevMeasurement)      // Note: derivative on measurement
@@ -203,21 +210,22 @@ void pi_task(void* arg){
 
     pwm_init(&left_cmp, &right_cmp);
 
+    float test_gain = 1.0f;
 
     // Set your Kp, Ki, T, limMin, limMax values on both structs (need to tune these by testing)
     // left wheel
-    left_wheel.Kp = 1.0f;
+    left_wheel.Kp = test_gain;
     left_wheel.Ki = 0.0f;
     left_wheel.T = 0.02f;
-    left_wheel.limMin = PWM_MIN - PWM_NEUTRAL;
-    left_wheel.limMax = PWM_MAX - PWM_NEUTRAL;
+    left_wheel.limMin = (PWM_MIN - PWM_NEUTRAL) / STARTING_KP;
+    left_wheel.limMax = (PWM_MAX - PWM_NEUTRAL) / STARTING_KP;
 
     // right wheel
-    right_wheel.Kp = 1.0f;
+    right_wheel.Kp = test_gain;
     right_wheel.Ki = 0.0f;
     right_wheel.T = 0.02f;
-    right_wheel.limMin = PWM_MIN - PWM_NEUTRAL;
-    right_wheel.limMax = PWM_MAX - PWM_NEUTRAL;
+    right_wheel.limMin = (PWM_MIN - PWM_NEUTRAL) / STARTING_KP;
+    right_wheel.limMax = (PWM_MAX - PWM_NEUTRAL) / STARTING_KP;
 
     // Note on tuning: The tuning process is iterative — start with Ki = 0 and tune Kp until the response is fast but not oscillating, then slowly increase Ki until steady state error disappears.
 
@@ -225,20 +233,45 @@ void pi_task(void* arg){
     float local_velocity_left = 0, local_velocity_right = 0;
     float left_out = 0, right_out = 0;
 
-    uint32_t left_width = 0, right_width = 0; 
+    // uint32_t left_width = 0, right_width = 0; 
 
-    for (;;){
-        // if new data arrives
-        if (xQueueReceive(q, &tsp, portMAX_DELAY) == pdTRUE){
+    // for (;;){
+    //     // if new data arrives
+    //     if (xQueueReceive(q, &tsp, portMAX_DELAY) == pdTRUE){
             
-            left_width = tsp.target_left_rads * 79.2 + PWM_NEUTRAL;
-            right_width = tsp.target_right_rads * 79.2 + PWM_NEUTRAL;
+    //         // left_width = tsp.target_left_rads * 79.2 + PWM_NEUTRAL;
+    //         // right_width = tsp.target_right_rads * 79.2 + PWM_NEUTRAL;
 
-            // no packet received in 100ms (added a timeout)
-            mcpwm_comparator_set_compare_value(left_cmp, left_width);
-            mcpwm_comparator_set_compare_value(right_cmp, right_width);
-        }
-    }
+    //         // testing:
+    //         left_width = 1550;
+    //         right_width = 1550;
+    //         ESP_LOGE("PWM", "Sending a PWM signal of %0.2f", left_width);
+
+    //         // no packet received in 100ms (added a timeout)
+    //         mcpwm_comparator_set_compare_value(left_cmp, left_width);
+    //         mcpwm_comparator_set_compare_value(right_cmp, right_width);
+    //     }
+    // }
+
+    // for (;;){
+
+    //     vTaskDelay(pdMS_TO_TICKS(20));
+
+    //     int diff = 450;
+    //     left_width = PWM_NEUTRAL + diff;
+    //     right_width = PWM_NEUTRAL - diff;
+    //     // ESP_LOGE("PWM", "Sending a PWM signal of %0.2f", left_width);
+
+    //     // no packet received in 100ms (added a timeout)
+    //     mcpwm_comparator_set_compare_value(left_cmp, left_width);
+    //     mcpwm_comparator_set_compare_value(right_cmp, right_width);
+
+    //     if (xSemaphoreTake(vel_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+    //         ESP_LOGE("PWM", "left_vel=%.2f right_vel=%.2f", shared_velocity_left, shared_velocity_right);
+    //         xSemaphoreGive(vel_mutex);
+    //     }
+
+    // }
 
     // forever loop
     for (;;){
@@ -265,12 +298,18 @@ void pi_task(void* arg){
         right_out = pid_controller_update(&right_wheel, tsp.target_right_rads, local_velocity_right);
 
         // applying PI output to the comparator
-        uint32_t left_pwm = (uint32_t) (PWM_NEUTRAL + left_out);
-        uint32_t right_pwm = (uint32_t) (PWM_NEUTRAL + right_out);
+        float left_pwm = PWM_NEUTRAL + (left_out * STARTING_KP);
+        float right_pwm = PWM_NEUTRAL + (right_out * STARTING_KP);
+
+        left_pwm = fmaxf(PWM_MIN, fminf(PWM_MAX, left_pwm));
+        right_pwm = fmaxf(PWM_MIN, fminf(PWM_MAX, right_pwm));
 
         //
-        mcpwm_comparator_set_compare_value(left_cmp,  left_pwm);
-        mcpwm_comparator_set_compare_value(right_cmp, right_pwm);
+        mcpwm_comparator_set_compare_value(left_cmp, (uint32_t) left_pwm);
+        mcpwm_comparator_set_compare_value(right_cmp, (uint32_t) right_pwm);
+
+        // ESP_LOGE("PI", "setpoint_left=%.2f setpoint_right=%.2f meas_left=%.2f meas_right=%.2f out_left=%.2f pwm_left=%lu",
+        //     tsp.target_left_rads, tsp.target_right_rads, local_velocity_left, local_velocity_right,left_out, left_pwm);
 
         // TODO: figure out the motor driver interface
         // TODO: need to add the feedforward term

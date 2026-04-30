@@ -75,16 +75,16 @@ void app_main(void){
         return;
     }
 
-    // // we are going to use this one in the future because we want to use both cores on the ESP32
-    // xTaskCreatePinnedToCore(
-    //     pcnt_read_task,         // task function
-    //     "pcnt_read_task",       // name of task
-    //     4096,                   // stack size in bytes
-    //     pcnt_tick_queue,        // args
-    //     5,                      // priority value (5 = medium priority)
-    //     NULL,                   // task handle (kill or suspend task later)
-    //     OUTBOUND_FLOW_CORE      // the core we want to use to compute       
-    // );
+    // we are going to use this one in the future because we want to use both cores on the ESP32
+    xTaskCreatePinnedToCore(
+        pcnt_read_task,         // task function
+        "pcnt_read_task",       // name of task
+        4096,                   // stack size in bytes
+        pcnt_tick_queue,        // args
+        5,                      // priority value (5 = medium priority)
+        NULL,                   // task handle (kill or suspend task later)
+        OUTBOUND_FLOW_CORE      // the core we want to use to compute       
+    );
 
     // xTaskCreatePinnedToCore(
     //     uart_send_task,         // task function
