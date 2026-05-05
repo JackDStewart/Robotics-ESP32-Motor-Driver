@@ -2,6 +2,7 @@
 #include "driver/mcpwm_oper.h"
 #include "driver/mcpwm_cmpr.h"
 #include "driver/mcpwm_gen.h"
+#include <stdbool.h>
 
 #define PWM_NEUTRAL 1500
 #define PWM_MAX 1950
@@ -14,7 +15,7 @@ extern float shared_velocity_left;
 extern float shared_velocity_right;
 
 typedef struct {
-
+    bool is_left;
     // controller gains (proportional, integral, and derivative)
     float Kp;
     float Ki;
@@ -42,7 +43,7 @@ typedef struct {
 } pid_controller_t;
 
 // functions for PID control
-void pid_controller_init(pid_controller_t *pid);
+void pid_controller_init(pid_controller_t *pid, bool is_left);
 void pwm_init(mcpwm_cmpr_handle_t *left_cmp, mcpwm_cmpr_handle_t *right_cmp);
 float pid_controller_update(pid_controller_t *pid, float setpoint, float measurement);
 void pi_reset(pid_controller_t *pid);

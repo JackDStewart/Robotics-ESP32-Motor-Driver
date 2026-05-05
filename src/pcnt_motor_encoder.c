@@ -102,11 +102,11 @@ void encoder_pcnt_init(void){
     ESP_ERROR_CHECK(pcnt_channel_set_edge_action(pcnt_chan_left_b, PCNT_CHANNEL_EDGE_ACTION_INCREASE, PCNT_CHANNEL_EDGE_ACTION_DECREASE));
     ESP_ERROR_CHECK(pcnt_channel_set_level_action(pcnt_chan_left_b, PCNT_CHANNEL_LEVEL_ACTION_KEEP, PCNT_CHANNEL_LEVEL_ACTION_INVERSE));
 
-    ESP_ERROR_CHECK(pcnt_channel_set_edge_action(pcnt_chan_right_a, PCNT_CHANNEL_EDGE_ACTION_DECREASE, PCNT_CHANNEL_EDGE_ACTION_INCREASE));
+    // Right wheel actions swapped to account for mirrored mounting
+    ESP_ERROR_CHECK(pcnt_channel_set_edge_action(pcnt_chan_right_a, PCNT_CHANNEL_EDGE_ACTION_INCREASE, PCNT_CHANNEL_EDGE_ACTION_DECREASE));
     ESP_ERROR_CHECK(pcnt_channel_set_level_action(pcnt_chan_right_a, PCNT_CHANNEL_LEVEL_ACTION_KEEP, PCNT_CHANNEL_LEVEL_ACTION_INVERSE));
-    ESP_ERROR_CHECK(pcnt_channel_set_edge_action(pcnt_chan_right_b, PCNT_CHANNEL_EDGE_ACTION_INCREASE, PCNT_CHANNEL_EDGE_ACTION_DECREASE));
+    ESP_ERROR_CHECK(pcnt_channel_set_edge_action(pcnt_chan_right_b, PCNT_CHANNEL_EDGE_ACTION_DECREASE, PCNT_CHANNEL_EDGE_ACTION_INCREASE));
     ESP_ERROR_CHECK(pcnt_channel_set_level_action(pcnt_chan_right_b, PCNT_CHANNEL_LEVEL_ACTION_KEEP, PCNT_CHANNEL_LEVEL_ACTION_INVERSE));
-
     // enable, clear, and start PCNT unit (left)
     ESP_LOGI(TAG, "enable pcnt unit left");
     ESP_ERROR_CHECK(pcnt_unit_enable(pcnt_unit_left));
@@ -152,7 +152,7 @@ void pcnt_read_task(void *arg) {
             right_last = right_count;
 
             // not sure how we want to compute it, but I just have it set to the left_tick
-            compute_data.dL = left_delta;
+            compute_data.dL = left_delta * -1;
             compute_data.dR = right_delta;
             compute_data.timestamp_ms = (esp_timer_get_time() / 1000);
 

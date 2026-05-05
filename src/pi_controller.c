@@ -11,9 +11,11 @@
 #define GAIN 0.082
 #define STARTING_KP (1/GAIN)
 
+#define INIT_GAIN 1.0F
+
 
 // --------------------------- PID and PWM Init Functions  ------------------------------------------
-void pid_controller_init(pid_controller_t *pid){
+void pid_controller_init(pid_controller_t *pid, bool is_left){
 
     // clearing controller mem vars
     pid->integrator = 0.0f;
@@ -23,6 +25,13 @@ void pid_controller_init(pid_controller_t *pid){
 
     // clearing out var
     pid->out = 0.0f;
+
+    pid->Kp = INIT_GAIN;
+    pid->Ki = 0.0f;
+    pid->T = 0.02f;
+    pid->limMin = (PWM_MIN - PWM_NEUTRAL) / STARTING_KP;
+    pid->limMax = (PWM_MAX - PWM_NEUTRAL) / STARTING_KP;
+    pid->is_left = is_left;
 }
 
 void pwm_init(mcpwm_cmpr_handle_t *left_cmp, mcpwm_cmpr_handle_t *right_cmp) {
@@ -116,7 +125,7 @@ void pwm_init(mcpwm_cmpr_handle_t *left_cmp, mcpwm_cmpr_handle_t *right_cmp) {
 float pid_controller_update(pid_controller_t *pid, float setpoint, float measurement){
 
     // error signal
-    float error = setpoint - measurement;
+    float error = (setpoint - measurement) * (pid->is_left ? 1.0f : -1.0f);    
     
     // proportional
     float proportional = pid->Kp * error;
@@ -202,30 +211,13 @@ void pi_task(void* arg){
     pid_controller_t left_wheel;
     pid_controller_t right_wheel;
 
-    pid_controller_init(&left_wheel);
-    pid_controller_init(&right_wheel);
+    pid_controller_init(&left_wheel, true);
+    pid_controller_init(&right_wheel, false);
 
     mcpwm_cmpr_handle_t left_cmp;
     mcpwm_cmpr_handle_t right_cmp;
 
     pwm_init(&left_cmp, &right_cmp);
-
-    float test_gain = 1.0f;
-
-    // Set your Kp, Ki, T, limMin, limMax values on both structs (need to tune these by testing)
-    // left wheel
-    left_wheel.Kp = test_gain;
-    left_wheel.Ki = 0.0f;
-    left_wheel.T = 0.02f;
-    left_wheel.limMin = (PWM_MIN - PWM_NEUTRAL) / STARTING_KP;
-    left_wheel.limMax = (PWM_MAX - PWM_NEUTRAL) / STARTING_KP;
-
-    // right wheel
-    right_wheel.Kp = test_gain;
-    right_wheel.Ki = 0.0f;
-    right_wheel.T = 0.02f;
-    right_wheel.limMin = (PWM_MIN - PWM_NEUTRAL) / STARTING_KP;
-    right_wheel.limMax = (PWM_MAX - PWM_NEUTRAL) / STARTING_KP;
 
     // Note on tuning: The tuning process is iterative — start with Ki = 0 and tune Kp until the response is fast but not oscillating, then slowly increase Ki until steady state error disappears.
 
@@ -296,7 +288,9 @@ void pi_task(void* arg){
 
         left_out = pid_controller_update(&left_wheel, tsp.target_left_rads, local_velocity_left);
         right_out = pid_controller_update(&right_wheel, tsp.target_right_rads, local_velocity_right);
-
+        right_out *= -1;
+        
+        ESP_LOGE("PWM", "left_out=%0.2f, right_out=%0.2f", left_out, right_out);
         // applying PI output to the comparator
         float left_pwm = PWM_NEUTRAL + (left_out * STARTING_KP);
         float right_pwm = PWM_NEUTRAL + (right_out * STARTING_KP);
