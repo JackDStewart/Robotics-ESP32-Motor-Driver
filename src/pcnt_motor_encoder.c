@@ -152,7 +152,7 @@ void pcnt_read_task(void *arg) {
             right_last = right_count;
 
             // not sure how we want to compute it, but I just have it set to the left_tick
-            compute_data.dL = left_delta * -1;
+            compute_data.dL = left_delta;
             compute_data.dR = right_delta;
             compute_data.timestamp_ms = (esp_timer_get_time() / 1000);
 
@@ -164,7 +164,7 @@ void pcnt_read_task(void *arg) {
 
                 shared_velocity_left = (compute_data.dL / 537.7) * 2 * M_PI / 0.02f;
                 shared_velocity_right = (compute_data.dR / 537.7) * 2 * M_PI / 0.02f;
-                // ESP_LOGE("Vel", "The left velocity is %.02f and the right velocity is %.02f", shared_velocity_left, shared_velocity_right);
+                ESP_LOGE("Vel", "The left velocity is %.02f and the right velocity is %.02f", shared_velocity_left, shared_velocity_right);
                 xSemaphoreGive(vel_mutex);
             }
 

@@ -11,7 +11,9 @@
 #define GAIN 0.082
 #define STARTING_KP (1/GAIN)
 
-#define INIT_GAIN 1.0F
+#define INIT_GAIN 1.5F
+#define FF_GAIN 80.0F // decrease to lower speed gain
+
 
 
 // --------------------------- PID and PWM Init Functions  ------------------------------------------
@@ -27,7 +29,7 @@ void pid_controller_init(pid_controller_t *pid, bool is_left){
     pid->out = 0.0f;
 
     pid->Kp = INIT_GAIN;
-    pid->Ki = 0.0f;
+    pid->Ki = 0.01f;
     pid->T = 0.02f;
     pid->limMin = (PWM_MIN - PWM_NEUTRAL) / STARTING_KP;
     pid->limMax = (PWM_MAX - PWM_NEUTRAL) / STARTING_KP;
@@ -150,8 +152,9 @@ float pid_controller_update(pid_controller_t *pid, float setpoint, float measure
             limMaxInt = 0.0f;
         }
 
+        // error fix from claude
         if (pid->limMin < proportional){
-            limMinInt = proportional - pid->limMin;
+            limMinInt = pid->limMin - proportional;  // Negative lower bound
         }
         else {
             limMinInt = 0.0f;
@@ -197,8 +200,8 @@ float pid_controller_update(pid_controller_t *pid, float setpoint, float measure
 
 void pi_reset(pid_controller_t *pid){
 
-    pid->integrator = 0;
-    pid->prevError = 0;
+    pid->integrator = 0.0f;
+    pid->prevError = 0.0f;
     pid->prevMeasurement = 0;
 }
 
@@ -291,14 +294,18 @@ void pi_task(void* arg){
         right_out *= -1;
         
         ESP_LOGE("PWM", "left_out=%0.2f, right_out=%0.2f", left_out, right_out);
-        // applying PI output to the comparator
-        float left_pwm = PWM_NEUTRAL + (left_out * STARTING_KP);
-        float right_pwm = PWM_NEUTRAL + (right_out * STARTING_KP);
+
+        // rough feedforward: map setpoint directly to PWM
+        float ff_left  = tsp.target_left_rads  * FF_GAIN;
+        float ff_right = tsp.target_right_rads * FF_GAIN;
+
+        float left_pwm  = PWM_NEUTRAL + ff_left  + (left_out  * STARTING_KP);
+        float right_pwm = PWM_NEUTRAL + ff_right + (right_out * STARTING_KP);
 
         left_pwm = fmaxf(PWM_MIN, fminf(PWM_MAX, left_pwm));
         right_pwm = fmaxf(PWM_MIN, fminf(PWM_MAX, right_pwm));
-
-        //
+        
+        // applying PI output to the comparator
         mcpwm_comparator_set_compare_value(left_cmp, (uint32_t) left_pwm);
         mcpwm_comparator_set_compare_value(right_cmp, (uint32_t) right_pwm);
 
