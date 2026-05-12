@@ -56,7 +56,9 @@ void app_main(void){
     
     //set log level to ERROR only
     // esp_log_level_set("*", ESP_LOG_VERBOSE);
-    esp_log_level_set("*", ESP_LOG_ERROR);
+    // esp_log_level_set("*", ESP_LOG_ERROR);
+    esp_log_level_set("*", ESP_LOG_NONE); 
+
 
     // creating a queue for PCNT ticks
     QueueHandle_t pcnt_tick_queue;
@@ -86,15 +88,15 @@ void app_main(void){
         OUTBOUND_FLOW_CORE      // the core we want to use to compute       
     );
 
-    // xTaskCreatePinnedToCore(
-    //     uart_send_task,         // task function
-    //     "uart_send_task",       // name of task
-    //     4096,                   // stack size in bytes
-    //     pcnt_tick_queue,        // args
-    //     5,                      // priority value (5 = medium priority)
-    //     NULL,                   // task handle (kill or suspend task later)
-    //     OUTBOUND_FLOW_CORE      // the core we want to use to send       
-    // );
+    xTaskCreatePinnedToCore(
+        uart_send_task,         // task function
+        "uart_send_task",       // name of task
+        4096,                   // stack size in bytes
+        pcnt_tick_queue,        // args
+        5,                      // priority value (5 = medium priority)
+        NULL,                   // task handle (kill or suspend task later)
+        OUTBOUND_FLOW_CORE      // the core we want to use to send       
+    );
 
     xTaskCreatePinnedToCore(
         uart_receive_task,      // task function

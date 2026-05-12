@@ -12,7 +12,7 @@
 #define STARTING_KP (1/GAIN)
 
 #define INIT_GAIN 1.5F
-#define FF_GAIN 80.0F // decrease to lower speed gain
+#define FF_GAIN 30.0F // decrease to lower speed gain
 
 
 
