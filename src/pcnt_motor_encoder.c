@@ -135,6 +135,7 @@ void pcnt_read_task(void *arg) {
 
     int left_last = 0;
     int right_last = 0;
+    uint32_t last_timestamp_ms = 0;
 
     while (true) {
 
@@ -151,10 +152,14 @@ void pcnt_read_task(void *arg) {
             int16_t right_delta = right_count - right_last;
             right_last = right_count;
 
+            uint32_t current_timestamp_ms = (esp_timer_get_time() / 1000);
+            uint32_t delta_time_ms = current_timestamp_ms - last_timestamp_ms;
+            last_timestamp_ms = current_timestamp_ms;
+
             // not sure how we want to compute it, but I just have it set to the left_tick
             compute_data.dL = left_delta;
             compute_data.dR = right_delta;
-            compute_data.timestamp_ms = (esp_timer_get_time() / 1000);
+            compute_data.timestamp_ms = current_timestamp_ms;
 
             // sending the data to the queue
             xQueueSend(q, &compute_data, 0);
@@ -162,8 +167,8 @@ void pcnt_read_task(void *arg) {
             // write to shared variable
             if (xSemaphoreTake(vel_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
 
-                shared_velocity_left = (compute_data.dL / 537.7) * 2 * M_PI / 0.02f;
-                shared_velocity_right = (compute_data.dR / 537.7) * 2 * M_PI / 0.02f;
+                shared_velocity_left = ((double)compute_data.dL / 537.7) * 2 * M_PI / delta_time_ms * 1000; // convert ms to s
+                shared_velocity_right = ((double)compute_data.dR / 537.7) * 2 * M_PI / delta_time_ms * 1000; // convert ms to s
                 ESP_LOGE("Vel", "The left velocity is %.02f and the right velocity is %.02f", shared_velocity_left, shared_velocity_right);
                 xSemaphoreGive(vel_mutex);
             }
