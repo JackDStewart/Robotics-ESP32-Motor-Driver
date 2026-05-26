@@ -12,12 +12,12 @@
 #define STARTING_KP (1/GAIN)
 
 #define INIT_GAIN 1.5F
-#define FF_GAIN 22.0F // decrease to lower speed gain
+#define FF_GAIN 19.0F // decrease to lower speed gain
 
 
 
 // --------------------------- PID and PWM Init Functions  ------------------------------------------
-void pid_controller_init(pid_controller_t *pid, bool is_left){
+void pi_controller_init(pid_controller_t *pid, bool is_left){
 
     // clearing controller mem vars
     pid->integrator = 0.0f;
@@ -29,7 +29,7 @@ void pid_controller_init(pid_controller_t *pid, bool is_left){
     pid->out = 0.0f;
 
     pid->Kp = INIT_GAIN;
-    pid->Ki = 0.01f;
+    pid->Ki = 0.05f;        // changed from 0.01 to 0.05
     pid->T = 0.02f;
     pid->limMin = (PWM_MIN - PWM_NEUTRAL) / STARTING_KP;
     pid->limMax = (PWM_MAX - PWM_NEUTRAL) / STARTING_KP;
@@ -124,7 +124,7 @@ void pwm_init(mcpwm_cmpr_handle_t *left_cmp, mcpwm_cmpr_handle_t *right_cmp) {
 // ---------------------------------------------------------------------------------------------------
 
 // ----------------- PI controller logic ------------------------------------------------------------
-float pid_controller_update(pid_controller_t *pid, float setpoint, float measurement){
+float pi_controller_update(pid_controller_t *pid, float setpoint, float measurement){
 
     // error signal
     float error = (setpoint - measurement) * (pid->is_left ? 1.0f : -1.0f);    
@@ -214,8 +214,8 @@ void pi_task(void* arg){
     pid_controller_t left_wheel;
     pid_controller_t right_wheel;
 
-    pid_controller_init(&left_wheel, true);
-    pid_controller_init(&right_wheel, false);
+    pi_controller_init(&left_wheel, true);
+    pi_controller_init(&right_wheel, false);
 
     mcpwm_cmpr_handle_t left_cmp;
     mcpwm_cmpr_handle_t right_cmp;
@@ -276,6 +276,15 @@ void pi_task(void* arg){
             
             // no packet received in 100ms (added a timeout)
             mcpwm_comparator_set_compare_value(left_cmp, PWM_NEUTRAL);
+            mcpwm_comparator_set_compare_value(right_cmp, 1495);
+            pi_reset(&left_wheel);
+            pi_reset(&right_wheel);
+            continue;
+        }
+
+        // adding this because of an integral windup issue I was having (may need to change this later)
+        if (tsp.target_left_rads == 0.0f && tsp.target_right_rads == 0.0f) {
+            mcpwm_comparator_set_compare_value(left_cmp, PWM_NEUTRAL);
             mcpwm_comparator_set_compare_value(right_cmp, PWM_NEUTRAL);
             pi_reset(&left_wheel);
             pi_reset(&right_wheel);
@@ -289,8 +298,8 @@ void pi_task(void* arg){
             xSemaphoreGive(vel_mutex);
         }
 
-        left_out = pid_controller_update(&left_wheel, tsp.target_left_rads, local_velocity_left);
-        right_out = pid_controller_update(&right_wheel, tsp.target_right_rads, local_velocity_right);
+        left_out = pi_controller_update(&left_wheel, tsp.target_left_rads, local_velocity_left);
+        right_out = pi_controller_update(&right_wheel, tsp.target_right_rads, local_velocity_right);
         right_out *= -1;
         
         ESP_LOGE("PWM", "left_out=%0.2f, right_out=%0.2f", left_out, right_out);
@@ -311,10 +320,5 @@ void pi_task(void* arg){
 
         // ESP_LOGE("PI", "setpoint_left=%.2f setpoint_right=%.2f meas_left=%.2f meas_right=%.2f out_left=%.2f pwm_left=%lu",
         //     tsp.target_left_rads, tsp.target_right_rads, local_velocity_left, local_velocity_right,left_out, left_pwm);
-
-        // TODO: figure out the motor driver interface
-        // TODO: need to add the feedforward term
-        // TODO: Apply the result to the PWM for each motor
     }
-
 }

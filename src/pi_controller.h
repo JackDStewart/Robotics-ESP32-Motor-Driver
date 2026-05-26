@@ -43,8 +43,8 @@ typedef struct {
 } pid_controller_t;
 
 // functions for PID control
-void pid_controller_init(pid_controller_t *pid, bool is_left);
+void pi_controller_init(pid_controller_t *pid, bool is_left);
 void pwm_init(mcpwm_cmpr_handle_t *left_cmp, mcpwm_cmpr_handle_t *right_cmp);
-float pid_controller_update(pid_controller_t *pid, float setpoint, float measurement);
+float pi_controller_update(pid_controller_t *pid, float setpoint, float measurement);
 void pi_reset(pid_controller_t *pid);
 void pi_task(void* arg);
