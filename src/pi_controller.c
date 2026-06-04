@@ -270,13 +270,12 @@ void pi_task(void* arg){
 
     // forever loop
     for (;;){
-
         // if new data arrives
         if (xQueueReceive(q, &tsp, pdMS_TO_TICKS(100)) != pdTRUE){
             
             // no packet received in 100ms (added a timeout)
             mcpwm_comparator_set_compare_value(left_cmp, PWM_NEUTRAL);
-            mcpwm_comparator_set_compare_value(right_cmp, 1495);
+            mcpwm_comparator_set_compare_value(right_cmp, PWM_NEUTRAL);
             pi_reset(&left_wheel);
             pi_reset(&right_wheel);
             continue;
@@ -286,8 +285,6 @@ void pi_task(void* arg){
         if (tsp.target_left_rads == 0.0f && tsp.target_right_rads == 0.0f) {
             mcpwm_comparator_set_compare_value(left_cmp, PWM_NEUTRAL);
             mcpwm_comparator_set_compare_value(right_cmp, PWM_NEUTRAL);
-            pi_reset(&left_wheel);
-            pi_reset(&right_wheel);
             continue;
         }
 
