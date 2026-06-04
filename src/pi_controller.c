@@ -13,6 +13,35 @@
 
 #define INIT_GAIN 1.5F
 #define FF_GAIN 19.0F // decrease to lower speed gain
+#define SETPOINT_CHANGE_THRESHOLD 1.0f
+
+#define LUT_SIZE 4
+
+typedef struct {
+
+    float max_speed;
+    float ff_gain;
+
+} ff_lut_t;
+
+// can change, currently tuning
+static const ff_lut_t FF_LUT[LUT_SIZE] = {
+
+    {.max_speed = 2.0f, .ff_gain = 35.0f},
+    {.max_speed = 4.0f, .ff_gain = 23.0f},
+    {.max_speed = 6.0f, .ff_gain = 19.0f},
+    {.max_speed = 999.0f, .ff_gain = 15.0f}
+};
+
+static float get_ff_gain(float speed){
+    float abs_speed = fabsf(speed);
+    for (int i = 0; i < LUT_SIZE; i++){
+        if (abs_speed <= FF_LUT[i].max_speed){
+            return FF_LUT[i].ff_gain;
+        }
+    }
+    return FF_LUT[LUT_SIZE-1].ff_gain;
+}
 
 
 
@@ -227,6 +256,7 @@ void pi_task(void* arg){
     target_speed_packet_t tsp = {0};
     float local_velocity_left = 0, local_velocity_right = 0;
     float left_out = 0, right_out = 0;
+    static float prev_target_left = 0, prev_target_right = 0;
 
     // uint32_t left_width = 0, right_width = 0; 
 
@@ -281,13 +311,25 @@ void pi_task(void* arg){
             continue;
         }
 
-        // adding this because of an integral windup issue I was having (may need to change this later)
+        // adding this because of an integral windup issue I was having (may need to change this)
         if (tsp.target_left_rads == 0.0f && tsp.target_right_rads == 0.0f) {
             mcpwm_comparator_set_compare_value(left_cmp, PWM_NEUTRAL);
             mcpwm_comparator_set_compare_value(right_cmp, PWM_NEUTRAL);
             continue;
         }
 
+        // reset integrator if setpoint changed significantly
+        if (fabsf(tsp.target_left_rads - prev_target_left) > SETPOINT_CHANGE_THRESHOLD ||
+            fabsf(tsp.target_right_rads - prev_target_right) > SETPOINT_CHANGE_THRESHOLD) {
+            pi_reset(&left_wheel);
+            pi_reset(&right_wheel);
+        }
+
+        // updating the previous target
+        prev_target_left = tsp.target_left_rads;
+        prev_target_right = tsp.target_right_rads;
+
+        // taking the sempahore so that the speeds can get updated
         if (xSemaphoreTake(vel_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
 
             local_velocity_left = shared_velocity_left;
@@ -295,6 +337,7 @@ void pi_task(void* arg){
             xSemaphoreGive(vel_mutex);
         }
 
+        // updating the left and right wheel 
         left_out = pi_controller_update(&left_wheel, tsp.target_left_rads, local_velocity_left);
         right_out = pi_controller_update(&right_wheel, tsp.target_right_rads, local_velocity_right);
         right_out *= -1;
@@ -302,8 +345,8 @@ void pi_task(void* arg){
         ESP_LOGE("PWM", "left_out=%0.2f, right_out=%0.2f", left_out, right_out);
 
         // rough feedforward: map setpoint directly to PWM
-        float ff_left  = tsp.target_left_rads  * FF_GAIN;
-        float ff_right = tsp.target_right_rads * FF_GAIN;
+        float ff_left  = tsp.target_left_rads  * get_ff_gain(tsp.target_left_rads);
+        float ff_right = tsp.target_right_rads * get_ff_gain(tsp.target_right_rads);
 
         float left_pwm  = PWM_NEUTRAL + ff_left  + (left_out  * STARTING_KP);
         float right_pwm = PWM_NEUTRAL + ff_right + (right_out * STARTING_KP);
